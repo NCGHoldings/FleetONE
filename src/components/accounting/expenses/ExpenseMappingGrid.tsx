@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { MasterExpenseImport, MasterExpenseRecord } from "@/hooks/useMasterExpenses";
+import { MasterExpenseImport, MasterExpenseRecord, useMasterExpenses } from "@/hooks/useMasterExpenses";
 import { supabase } from "@/integrations/supabase/client";
 import { CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,6 +14,7 @@ import { useChartOfAccounts } from "@/hooks/useAccountingData";
 import { useCreateJournalEntry, usePostJournalEntry, useCreateAPInvoice, useCreateAPPayment } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useVendors, useCustomers } from "@/hooks/useAccountingData";
 import { 
   Building2, 
@@ -23,20 +24,23 @@ import {
   ArrowRightLeft, 
   FileText,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Trash2
 } from "lucide-react";
 
 interface Props {
   importData: MasterExpenseImport;
+  onDelete?: () => void;
 }
 
-export function ExpenseMappingGrid({ importData }: Props) {
+export function ExpenseMappingGrid({ importData, onDelete }: Props) {
   const [records, setRecords] = useState<MasterExpenseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Accounting mapping hooks
   const { data: accounts } = useChartOfAccounts();
+  const { deleteExpenseSheet } = useMasterExpenses();
   const createJournal = useCreateJournalEntry();
   const createAPInvoice = useCreateAPInvoice();
   const createAPPayment = useCreateAPPayment();
@@ -586,6 +590,21 @@ export function ExpenseMappingGrid({ importData }: Props) {
             </Button>
           )}
 
+          <Button
+            variant="destructive"
+            size="icon"
+            disabled={deleteExpenseSheet.isPending}
+            onClick={async () => {
+              if (window.confirm("Are you sure you want to permanently delete this import and all its unposted records?")) {
+                await deleteExpenseSheet.mutateAsync(importData.id);
+                if (onDelete) onDelete();
+              }
+            }}
+            title="Delete this import completely"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+
           {(isSpecialHire || isSchoolBus) && (
              <Button 
                variant="secondary" 
@@ -612,7 +631,7 @@ export function ExpenseMappingGrid({ importData }: Props) {
             />
           </div>
           
-          {!isSpecialHire && selectedIds.size > 0 && (
+          {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto bg-blue-50/50 p-2 rounded-md border border-blue-100">
               <span className="text-xs font-medium text-blue-800 whitespace-nowrap pl-2">Bulk Map ({selectedIds.size}):</span>
               
@@ -806,9 +825,29 @@ export function ExpenseMappingGrid({ importData }: Props) {
                   </TableCell>
                   <TableCell className="text-right">
                      {r.is_confirmed ? (
-                       <Badge variant="outline" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200" title={`Posted: ${r.gl_journal_id || 'AP Module'}`}>
-                         <CheckCircle2 className="h-3 w-3 mr-1" /> Posted
-                       </Badge>
+                       <TooltipProvider>
+                         <Tooltip>
+                           <TooltipTrigger asChild>
+                             <Badge variant="outline" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 cursor-help">
+                               <CheckCircle2 className="h-3 w-3 mr-1" /> Posted
+                             </Badge>
+                           </TooltipTrigger>
+                           <TooltipContent className="p-3 w-64 space-y-2 bg-white border shadow-md" side="left">
+                             <div className="font-semibold text-sm border-b pb-1 mb-2">Posting Breakdown</div>
+                             {r.mapped_vendor_id && (
+                               <div className="text-xs flex justify-between"><span className="text-muted-foreground">Vendor:</span> <span className="font-medium truncate max-w-[120px]">{vendors?.find(v => v.id === r.mapped_vendor_id)?.vendor_name || 'Mapped'}</span></div>
+                             )}
+                             <div className="text-xs flex justify-between"><span className="text-muted-foreground">Debit (Dr):</span> <span className="font-medium truncate max-w-[120px]">{expenseOptions.find(o => o.value === r.mapped_expense_account_id)?.label || apAccounts.find(o => o.value === r.mapped_expense_account_id)?.label || 'Auto'}</span></div>
+                             <div className="text-xs flex justify-between"><span className="text-muted-foreground">Credit (Cr):</span> <span className="font-medium truncate max-w-[120px]">{paymentOptions.find(o => o.value === r.mapped_payment_account_id)?.label || apAccounts.find(o => o.value === r.mapped_payment_account_id)?.label || 'Auto'}</span></div>
+                             {r.mapped_vehicle_id && (
+                               <div className="text-xs flex justify-between"><span className="text-muted-foreground">Vehicle:</span> <span className="font-medium truncate max-w-[120px]">{vehicles.find(v => v.id === r.mapped_vehicle_id)?.bus_no || 'Mapped'}</span></div>
+                             )}
+                             <div className="text-[10px] text-muted-foreground mt-2 pt-1 border-t truncate">
+                               Ref: {r.gl_journal_id || 'AP Module'}
+                             </div>
+                           </TooltipContent>
+                         </Tooltip>
+                       </TooltipProvider>
                      ) : (
                        <Button 
                          size="sm" 

@@ -162,7 +162,9 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         }
       }
 
-      const data = await fetchAllRows(query);
+      // Limit to 1000 records to prevent massive payload delays and browser freezing
+      const { data, error } = await query.limit(1000);
+      if (error) throw error;
       return data;
     },
     enabled: !!effectiveCompanyId,
@@ -583,7 +585,8 @@ export const useAPPayments = () => {
         .from("ap_payments")
         .select(`
           *,
-          vendors (vendor_name),
+          vendors (vendor_code, vendor_name, address, bank_account, bank_name, bank_branch),
+          vendor_bank_accounts (id, bank_name, bank_branch, account_number, account_holder_name),
           bank_accounts (account_name, bank_name, account_number)
         `)
         .order("payment_date", { ascending: false });
@@ -1448,10 +1451,10 @@ export const useRecurringEntries = () => {
     queryKey: ["recurring-entries", effectiveCompanyId],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
+      // Note: recurring_journal_entries table has no company_id column
       let query = supabase
         .from("recurring_journal_entries" as any)
         .select("*")
-        .eq("company_id", effectiveCompanyId)
         .order("template_name");
 
       const { data, error } = await query;

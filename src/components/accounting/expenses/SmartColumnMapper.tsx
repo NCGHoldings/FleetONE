@@ -145,25 +145,36 @@ export const SmartColumnMapper = ({ file, importCategory, onMappingComplete, onC
         let val = row[m.sourceColumn];
         
         // Normalize Dates
-        if (m.targetField === 'expense_date' && val) {
+        if (m.targetField === 'expense_date' && val !== undefined && val !== null) {
           try {
-            // 1. Try standard JS parsing
-            let dateObj = new Date(val);
+            let dateObj: Date = new Date(NaN);
             
-            // 2. If invalid, try parsing DD/MM/YY or DD/MM/YYYY (common in SL)
-            if (isNaN(dateObj.getTime()) && typeof val === 'string') {
-              const parts = val.split(/[-/]/);
-              if (parts.length === 3) {
-                const p1 = parseInt(parts[0], 10);
-                const p2 = parseInt(parts[1], 10);
-                let p3 = parseInt(parts[2], 10);
-                
-                // Assuming DD/MM/YY(YY)
-                if (p1 > 0 && p1 <= 31 && p2 > 0 && p2 <= 12) {
-                  if (p3 < 100) p3 += 2000; // Convert 2-digit year
-                  dateObj = new Date(p3, p2 - 1, p1);
+            // Handle Excel serial date numbers
+            if (typeof val === 'number') {
+              dateObj = new Date(Math.round((val - 25569) * 86400 * 1000));
+            } else if (typeof val === 'string') {
+              const dateStr = val.trim();
+              
+              // 1. Try DD/MM/YYYY or DD-MM-YYYY FIRST!
+              const dmyMatch = dateStr.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+              if (dmyMatch) {
+                const day = parseInt(dmyMatch[1], 10);
+                const month = parseInt(dmyMatch[2], 10) - 1;
+                let year = parseInt(dmyMatch[3], 10);
+                if (year < 100) year += 2000;
+                dateObj = new Date(year, month, day);
+              } else {
+                // 2. Try YYYY-MM-DD
+                const ymdMatch = dateStr.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+                if (ymdMatch) {
+                  dateObj = new Date(parseInt(ymdMatch[1]), parseInt(ymdMatch[2]) - 1, parseInt(ymdMatch[3]));
+                } else {
+                  // 3. Fallback to standard JS parsing
+                  dateObj = new Date(val);
                 }
               }
+            } else if (val instanceof Date) {
+              dateObj = val;
             }
 
             if (!isNaN(dateObj.getTime())) {
@@ -176,6 +187,19 @@ export const SmartColumnMapper = ({ file, importCategory, onMappingComplete, onC
           } catch (e) {
             console.error("Date normalization error:", e);
           }
+        }
+        
+        // Normalize Amounts
+        if (m.targetField === 'amount' && val !== undefined && val !== null) {
+          if (typeof val === 'string') {
+            // Remove commas, then extract the numeric part safely to avoid NaN issues with "Rs. 25,000"
+            const noCommas = val.replace(/,/g, '');
+            const match = noCommas.match(/-?\d+(?:\.\d+)?/);
+            val = match ? parseFloat(match[0]) : 0;
+          } else if (typeof val === 'number') {
+            val = Number(val);
+          }
+          if (isNaN(val)) val = 0;
         }
         
         mappedRow[m.targetField] = val;

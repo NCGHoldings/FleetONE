@@ -501,115 +501,126 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
     <div className={cn("space-y-6", !isActive && "hidden")}>
         <Form {...form}>
           <form className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-              <FormField
-                control={form.control}
-                name="invoice_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>AP Invoice #</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Auto-generating..." readOnly className="bg-muted/50 font-mono" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="vendor_bill_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vendor Bill #</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Vendor's invoice no." className="font-mono" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="vendor_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vendor</FormLabel>
-                    <SearchableVendorSelector
-                      value={field.value}
-                      onValueChange={handleVendorChange}
-                      showQuickAdd={true}
-                    />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="agent_reference"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sub-Vendor / Agent</FormLabel>
-                    <SearchableVendorSelector
-                      value={field.value || ""}
-                      onValueChange={field.onChange}
-                      placeholder="Select agent..."
-                      showQuickAdd={true}
-                      valueType="name"
-                    />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="invoice_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invoice Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="due_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Due Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {isParentView && (
+            {/* Header Fields - Organized in a modern card */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200/60 shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4">
                 <FormField
                   control={form.control}
-                  name="business_unit_code"
+                  name="vendor_id"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Business Unit</FormLabel>
-                      <BusinessUnitSelector
-                        value={field.value || "HQ"}
-                        onChange={field.onChange}
-                        showAllOption={false}
+                    <FormItem className="col-span-1 md:col-span-6">
+                      <FormLabel className="text-slate-600 font-medium">Vendor</FormLabel>
+                      <SearchableVendorSelector
+                        value={field.value}
+                        onValueChange={handleVendorChange}
+                        showQuickAdd={true}
                       />
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
+
+                <FormField
+                  control={form.control}
+                  name="agent_reference"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 md:col-span-6">
+                      <FormLabel className="text-slate-600 font-medium">Actual Vendor <span className="text-slate-400 font-normal">(Optional)</span></FormLabel>
+                      <SearchableVendorSelector
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                        placeholder="Select agent..."
+                        showQuickAdd={true}
+                        valueType="name"
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="invoice_number"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 md:col-span-3">
+                      <FormLabel className="text-slate-600 font-medium">AP Invoice #</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Auto-generating..." readOnly className="bg-slate-50 font-mono" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="vendor_bill_number"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 md:col-span-3">
+                      <FormLabel className="text-slate-600 font-medium">Vendor Bill #</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Vendor's invoice no." className="font-mono bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="invoice_date"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 md:col-span-3">
+                      <FormLabel className="text-slate-600 font-medium">Invoice Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="due_date"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 md:col-span-3">
+                      <FormLabel className="text-slate-600 font-medium">Due Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {isParentView && (
+                  <FormField
+                    control={form.control}
+                    name="business_unit_code"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1 md:col-span-12 mt-2">
+                        <FormLabel className="text-slate-600 font-medium">Business Unit</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="w-full md:w-1/4 bg-white">
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="HQ">HQ / Central</SelectItem>
+                            <SelectItem value="NORTH">Northern Division</SelectItem>
+                            <SelectItem value="SOUTH">Southern Division</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
             </div>
+
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">

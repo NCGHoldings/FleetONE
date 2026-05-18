@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Plus, Pencil, User, Building2, Loader2, MapPin, AlertTriangle
@@ -120,6 +122,102 @@ export const PettyCashFundsTab = () => {
     toast({ title: "Action Blocked", description: "Funds cannot be deleted. Edit the fund to reassign or update details.", variant: "destructive" });
   };
 
+  const columns: ColumnDef<any>[] = useMemo(() => [
+    {
+      accessorKey: "fund_name",
+      header: "Fund Name",
+      cell: ({ row }) => <span className="font-medium">{row.original.fund_name}</span>,
+    },
+    {
+      id: "company",
+      accessorFn: (row) => row.company?.short_code || row.company?.name || "-",
+      header: "Section",
+      cell: ({ row }) => {
+        const company = row.original.company;
+        return company ? <Badge variant="secondary" className="text-xs">{company.short_code || company.name}</Badge> : <span>-</span>;
+      },
+    },
+    {
+      accessorKey: "fund_type",
+      header: "Type",
+      cell: ({ row }) => <Badge variant="outline">{row.original.fund_type || "main"}</Badge>,
+    },
+    {
+      id: "branch",
+      accessorFn: (row) => row.branch?.branch_name || "-",
+      header: "Branch",
+      cell: ({ row }) => {
+        const branch = row.original.branch;
+        return branch ? (
+          <span className="flex items-center gap-1 text-sm">
+            <MapPin className="h-3 w-3" /> {branch.branch_name}
+          </span>
+        ) : <span>-</span>;
+      },
+    },
+    {
+      accessorKey: "business_unit_code",
+      header: "Unit",
+      cell: ({ row }) => <Badge variant="secondary">{row.original.business_unit_code}</Badge>,
+    },
+    {
+      accessorKey: "custodian_name",
+      header: "Custodian",
+      cell: ({ row }) => {
+        const custodian_name = row.original.custodian_name;
+        return custodian_name ? (
+          <span className="flex items-center gap-1 text-sm">
+            <User className="h-3 w-3" /> {custodian_name}
+          </span>
+        ) : <span>-</span>;
+      },
+    },
+    {
+      accessorKey: "opening_balance",
+      header: "Opening",
+      cell: ({ row }) => <div className="text-right"><CurrencyDisplay amount={row.original.opening_balance} /></div>,
+    },
+    {
+      accessorKey: "current_balance",
+      header: "Current",
+      cell: ({ row }) => {
+        const fund = row.original;
+        const isLow = fund.low_balance_threshold > 0 && fund.current_balance <= fund.low_balance_threshold;
+        return (
+          <div className="text-right">
+            <span className={isLow ? "text-destructive font-semibold" : ""}>
+              <CurrencyDisplay amount={fund.current_balance} />
+            </span>
+            {isLow && (
+              <AlertTriangle className="h-3 w-3 text-destructive inline ml-1" />
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "fund_limit",
+      header: "Limit",
+      cell: ({ row }) => <div className="text-right">{row.original.fund_limit > 0 ? <CurrencyDisplay amount={row.original.fund_limit} /> : "-"}</div>,
+    },
+    {
+      accessorKey: "low_balance_threshold",
+      header: "Threshold",
+      cell: ({ row }) => <div className="text-right">{row.original.low_balance_threshold > 0 ? <CurrencyDisplay amount={row.original.low_balance_threshold} /> : "-"}</div>,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" onClick={() => openEdit(row.original)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ], []);
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -155,80 +253,19 @@ export const PettyCashFundsTab = () => {
       </div>
 
       {/* Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Fund Name</TableHead>
-              <TableHead>Section</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Branch</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Custodian</TableHead>
-              <TableHead className="text-right">Opening</TableHead>
-              <TableHead className="text-right">Current</TableHead>
-              <TableHead className="text-right">Limit</TableHead>
-              <TableHead className="text-right">Threshold</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
-              </TableRow>
-            ) : funds?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No funds found</TableCell>
-              </TableRow>
-            ) : (
-              funds?.map((fund: any) => (
-                <TableRow key={fund.id}>
-                  <TableCell className="font-medium">{fund.fund_name}</TableCell>
-                  <TableCell>
-                    {fund.company ? (
-                      <Badge variant="secondary" className="text-xs">{fund.company.short_code || fund.company.name}</Badge>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell><Badge variant="outline">{fund.fund_type || "main"}</Badge></TableCell>
-                  <TableCell>
-                    {fund.branch ? (
-                      <span className="flex items-center gap-1 text-sm">
-                        <MapPin className="h-3 w-3" /> {fund.branch.branch_name}
-                      </span>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell><Badge variant="secondary">{fund.business_unit_code}</Badge></TableCell>
-                  <TableCell>
-                    {fund.custodian_name ? (
-                      <span className="flex items-center gap-1 text-sm">
-                        <User className="h-3 w-3" /> {fund.custodian_name}
-                      </span>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell className="text-right"><CurrencyDisplay amount={fund.opening_balance} /></TableCell>
-                  <TableCell className="text-right">
-                    <span className={fund.low_balance_threshold > 0 && fund.current_balance <= fund.low_balance_threshold ? "text-destructive font-semibold" : ""}>
-                      <CurrencyDisplay amount={fund.current_balance} />
-                    </span>
-                    {fund.low_balance_threshold > 0 && fund.current_balance <= fund.low_balance_threshold && (
-                      <AlertTriangle className="h-3 w-3 text-destructive inline ml-1" />
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">{fund.fund_limit > 0 ? <CurrencyDisplay amount={fund.fund_limit} /> : "-"}</TableCell>
-                  <TableCell className="text-right">{fund.low_balance_threshold > 0 ? <CurrencyDisplay amount={fund.low_balance_threshold} /> : "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(fund)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <Card className="p-4 border-none shadow-none">
+        {isLoading ? (
+          <div className="text-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={funds || []}
+            searchKey="fund_name"
+            enableColumnFilters={true}
+          />
+        )}
       </Card>
 
       {/* Create/Edit Dialog */}

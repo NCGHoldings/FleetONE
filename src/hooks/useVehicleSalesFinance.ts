@@ -175,27 +175,27 @@ export async function createVehicleCustomer({
       return existingByNameScoped.id;
     }
 
-    // Try by phone or email — STRICTLY module-scoped only
-    // ⚠️ NO GLOBAL FALLBACK — prevents cross-module customer collisions via shared phone/email
+    // Try by phone or email globally across the company
+    // We MUST allow global fallback for contact info because the database enforces unique constraints
+    // on phone and email (e.g. idx_customers_unique_phone).
     if (customerPhone || customerEmail) {
-      let scopedQuery = supabase
-        .from('customers')
-        .select('id')
-        .eq('company_id', companyId)
-        .eq('business_unit_code', businessUnitCode);
+      const orConditions = [];
+      if (customerPhone) orConditions.push(`phone.eq.${customerPhone}`);
+      if (customerEmail) orConditions.push(`email.eq.${customerEmail}`);
+      
+      if (orConditions.length > 0) {
+        const { data: existingByContactGlobal } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('company_id', companyId)
+          .or(orConditions.join(','))
+          .limit(1)
+          .maybeSingle();
 
-      if (customerPhone) {
-        scopedQuery = scopedQuery.or(`phone.eq.${customerPhone}`);
-      }
-      if (customerEmail) {
-        scopedQuery = scopedQuery.or(`email.eq.${customerEmail}`);
-      }
-
-      const { data: existingByContactScoped } = await scopedQuery.limit(1).maybeSingle();
-
-      if (existingByContactScoped?.id) {
-        console.log(`[${module.toUpperCase()} Finance] Found existing customer by contact (module-scoped):`, existingByContactScoped.id);
-        return existingByContactScoped.id;
+        if (existingByContactGlobal?.id) {
+          console.log(`[${module.toUpperCase()} Finance] Found existing customer by contact (global fallback):`, existingByContactGlobal.id);
+          return existingByContactGlobal.id;
+        }
       }
     }
 

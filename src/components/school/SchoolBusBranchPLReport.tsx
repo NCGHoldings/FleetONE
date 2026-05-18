@@ -114,16 +114,23 @@ const SchoolBusBranchPLReport = ({ branchId, branchName, branchCode, onBack }: P
     },
   });
 
-  // ===== FETCH INCOME (school_payment_transactions) =====
+  // ===== FETCH INCOME (Accrued from school_ar_invoices) =====
   const { data: incomeData = [] } = useQuery({
     queryKey: ["sbs-income-pl", branchId, monthStart, monthEnd],
     queryFn: async () => {
       const { data } = await supabase
-        .from("school_payment_transactions")
-        .select("amount_paid, school_students!inner(branch_id, route)")
-        .gte("payment_date", monthStart)
-        .lte("payment_date", monthEnd)
-        .eq("school_students.branch_id", branchId);
+        .from("school_ar_invoices")
+        .select(`
+          amount, 
+          paid_amount, 
+          school_students!inner(branch_id, route),
+          ar_invoices!inner(id)
+        `)
+        .gte("invoice_month", monthStart)
+        .lte("invoice_month", monthEnd)
+        .eq("school_students.branch_id", branchId)
+        .in("status", ["posted", "paid", "partial"])
+        .limit(10000);
       return data || [];
     },
   });
@@ -151,7 +158,7 @@ const SchoolBusBranchPLReport = ({ branchId, branchName, branchCode, onBack }: P
       // Compute income for this bus by matching the route
       const busIncome = incomeData
         .filter((p: any) => p.school_students?.route === bus.route_name)
-        .reduce((sum: number, p: any) => sum + (Number(p.amount_paid) || 0), 0);
+        .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
 
       // Compute expenses for this bus
       const busExpenses = expenseData.filter((e: any) => e.bus_id === bus.id);

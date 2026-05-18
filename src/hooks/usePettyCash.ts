@@ -571,7 +571,7 @@ export const useCreatePettyCashTransaction = () => {
 
             if (!jeError && je) {
               // Create journal lines
-              await supabase.from("journal_entry_lines").insert([
+              const { error: linesError } = await supabase.from("journal_entry_lines").insert([
                 {
                   journal_entry_id: je.id,
                   account_id: debitAccountId,
@@ -590,39 +590,44 @@ export const useCreatePettyCashTransaction = () => {
                 },
               ]);
 
-              // Update COA balances
-              for (const acctId of [debitAccountId, creditAccountId]) {
-                const { data: acct } = await supabase
-                  .from("chart_of_accounts")
-                  .select("current_balance, account_type")
-                  .eq("id", acctId)
-                  .single();
-
-                if (acct) {
-                  const isDebit = acctId === debitAccountId;
-                  const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
-                  const adjustment = isDebit
-                    ? (isDebitNormal ? amount : -amount)
-                    : (isDebitNormal ? -amount : amount);
-
-                  await supabase
+              if (linesError) {
+                console.error("Failed to insert JE lines:", linesError);
+                await supabase.from("journal_entries").delete().eq("id", je.id);
+              } else {
+                // Update COA balances
+                for (const acctId of [debitAccountId, creditAccountId]) {
+                  const { data: acct } = await supabase
                     .from("chart_of_accounts")
-                    .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
-                    .eq("id", acctId);
+                    .select("current_balance, account_type")
+                    .eq("id", acctId)
+                    .single();
+
+                  if (acct) {
+                    const isDebit = acctId === debitAccountId;
+                    const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
+                    const adjustment = isDebit
+                      ? (isDebitNormal ? amount : -amount)
+                      : (isDebitNormal ? -amount : amount);
+
+                    await supabase
+                      .from("chart_of_accounts")
+                      .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
+                      .eq("id", acctId);
+                  }
                 }
-              }
 
-              // Link JE to transaction
-              await supabase
-                .from("petty_cash_transactions")
-                .update({ journal_entry_id: je.id })
-                .eq("id", result.id);
-
-              if (createdApPaymentId) {
+                // Link JE to transaction
                 await supabase
-                  .from("ap_payments")
+                  .from("petty_cash_transactions")
                   .update({ journal_entry_id: je.id })
-                  .eq("id", createdApPaymentId);
+                  .eq("id", result.id);
+              
+                if (createdApPaymentId) {
+                  await supabase
+                    .from("ap_payments")
+                    .update({ journal_entry_id: je.id })
+                    .eq("id", createdApPaymentId);
+                }
               }
             }
           } else {
@@ -1805,7 +1810,7 @@ export const useCreatePettyCashTopUp = () => {
             .single();
 
           if (!jeError && je) {
-             await supabase.from("journal_entry_lines").insert([
+             const { error: linesError } = await supabase.from("journal_entry_lines").insert([
               {
                 journal_entry_id: je.id,
                 account_id: debitGL,
@@ -1824,29 +1829,34 @@ export const useCreatePettyCashTopUp = () => {
               },
             ]);
 
-            // Update COA balances
-            for (const acctId of [debitGL, creditGL]) {
-              const { data: acct } = await supabase
-                .from("chart_of_accounts")
-                .select("current_balance, account_type")
-                .eq("id", acctId)
-                .single();
-              if (acct) {
-                const isDebit = acctId === debitGL;
-                const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
-                const adjustment = isDebit
-                  ? (isDebitNormal ? data.amount : -data.amount)
-                  : (isDebitNormal ? -data.amount : data.amount);
-                await supabase
+            if (linesError) {
+              console.error("Failed to insert Top-Up JE lines:", linesError);
+              await supabase.from("journal_entries").delete().eq("id", je.id);
+            } else {
+              // Update COA balances
+              for (const acctId of [debitGL, creditGL]) {
+                const { data: acct } = await supabase
                   .from("chart_of_accounts")
-                  .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
-                  .eq("id", acctId);
+                  .select("current_balance, account_type")
+                  .eq("id", acctId)
+                  .single();
+                if (acct) {
+                  const isDebit = acctId === debitGL;
+                  const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
+                  const adjustment = isDebit
+                    ? (isDebitNormal ? data.amount : -data.amount)
+                    : (isDebitNormal ? -data.amount : data.amount);
+                  await supabase
+                    .from("chart_of_accounts")
+                    .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
+                    .eq("id", acctId);
+                }
               }
-            }
 
-            // Link JE
-            if (pcTx) {
-               await supabase.from("petty_cash_transactions").update({ journal_entry_id: je.id }).eq("id", pcTx.id);
+              // Link JE
+              if (pcTx) {
+                 await supabase.from("petty_cash_transactions").update({ journal_entry_id: je.id }).eq("id", pcTx.id);
+              }
             }
           }
       }
@@ -1908,5 +1918,221 @@ export const useDeleteIOU = () => {
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
+  });
+};
+
+export const usePettyCashGLSyncPreview = (transactionId: string | null) => {
+  return useQuery({
+    queryKey: ["petty-cash-gl-sync-preview", transactionId],
+    queryFn: async () => {
+      if (!transactionId) return null;
+
+      const { data: txn, error: txnError } = await supabase
+        .from("petty_cash_transactions")
+        .select("*")
+        .eq("id", transactionId)
+        .single();
+
+      if (txnError || !txn) throw new Error("Transaction not found");
+
+      const { data: fund, error: fundError } = await supabase
+        .from("petty_cash_funds")
+        .select("gl_account_id, fund_name, company_id")
+        .eq("id", txn.petty_cash_fund_id)
+        .single();
+
+      if (fundError || !fund) throw new Error("Associated Petty Cash Fund not found");
+      if (!fund.gl_account_id) throw new Error("Fund does not have a mapped GL account.");
+
+      const amount = txn.amount;
+      const txnType = txn.transaction_type;
+      const companyId = fund.company_id || txn.company_id;
+
+      let debitAccountId = "";
+      let creditAccountId = "";
+      let jeDescription = "";
+
+      if (txnType === "disbursement") {
+        creditAccountId = fund.gl_account_id;
+        if (txn.expense_category) {
+           const { data: expCat } = await supabase
+            .from("expense_categories")
+            .select("gl_account_id")
+            .eq("name", txn.expense_category)
+            .eq("company_id", companyId)
+            .maybeSingle();
+           if (expCat?.gl_account_id) debitAccountId = expCat.gl_account_id;
+        }
+        if (!debitAccountId) {
+          const { data: defaultExp } = await supabase.from("chart_of_accounts")
+            .select("id").eq("company_id", companyId).eq("account_type", "expense").limit(1).maybeSingle();
+          debitAccountId = defaultExp?.id || "";
+        }
+        jeDescription = `Petty Cash Expense: ${txn.description || txn.expense_category}`;
+      } else {
+        debitAccountId = fund.gl_account_id;
+        if (txn.expense_category === "IOU Cash Return") {
+          const { data: defaultAdv } = await supabase.from("chart_of_accounts")
+            .select("id").eq("company_id", companyId).eq("account_type", "asset").ilike("account_name", "%advance%").limit(1).maybeSingle();
+          creditAccountId = defaultAdv?.id || "";
+        }
+        if (!creditAccountId) {
+           const { data: glSettings } = await supabase.from("gl_settings" as any)
+            .select("bank_account_id").eq("company_id", companyId).maybeSingle();
+           creditAccountId = (glSettings as any)?.bank_account_id || "";
+        }
+        if (!creditAccountId) {
+          const { data: defaultBank } = await supabase.from("chart_of_accounts")
+            .select("id").eq("company_id", companyId).eq("account_type", "asset").ilike("account_name", "%bank%").limit(1).maybeSingle();
+          creditAccountId = defaultBank?.id || "";
+        }
+        jeDescription = `Petty Cash Replenishment/Return: ${txn.description || "Top-up"}`;
+      }
+
+      return {
+        amount,
+        debitAccountId,
+        creditAccountId,
+        jeDescription,
+        companyId,
+        txn
+      };
+    },
+    enabled: !!transactionId,
+  });
+};
+
+export const useSyncPettyCashGL = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (arg: string | { transactionId: string, overrideDebitAccountId?: string, overrideCreditAccountId?: string }) => {
+      const transactionId = typeof arg === "string" ? arg : arg.transactionId;
+      const overrideDebitAccountId = typeof arg === "object" ? arg.overrideDebitAccountId : undefined;
+      const overrideCreditAccountId = typeof arg === "object" ? arg.overrideCreditAccountId : undefined;
+
+      // 1. Fetch transaction
+      const { data: txn, error: txnError } = await supabase
+        .from("petty_cash_transactions")
+        .select("*")
+        .eq("id", transactionId)
+        .single();
+
+      if (txnError || !txn) throw new Error("Transaction not found");
+      if (txn.journal_entry_id) throw new Error("This transaction is already synced to the General Ledger.");
+
+      // 2. Fetch Fund for GL account
+      const { data: fund, error: fundError } = await supabase
+        .from("petty_cash_funds")
+        .select("gl_account_id, fund_name, company_id")
+        .eq("id", txn.petty_cash_fund_id)
+        .single();
+
+      if (fundError || !fund) throw new Error("Associated Petty Cash Fund not found");
+      if (!fund.gl_account_id) throw new Error("Fund does not have a mapped GL account.");
+
+      const amount = txn.amount;
+      const txnType = txn.transaction_type;
+      
+      // CRITICAL: The Journal Entry MUST belong to the same company as the Petty Cash Fund,
+      // because the fund's GL account is anchored to that company. 
+      // Using txn.company_id if it differs causes a Tenant Isolation Breach.
+      const companyId = fund.company_id || txn.company_id;
+
+      let debitAccountId = overrideDebitAccountId || "";
+      let creditAccountId = overrideCreditAccountId || "";
+      let jeDescription = "";
+
+      if (txnType === "disbursement") {
+        if (!creditAccountId) creditAccountId = fund.gl_account_id;
+        // Fetch expense account based on category
+        if (!debitAccountId && txn.expense_category) {
+           const { data: expCat } = await supabase
+            .from("expense_categories")
+            .select("gl_account_id")
+            .eq("name", txn.expense_category)
+            .eq("company_id", companyId)
+            .maybeSingle();
+           if (expCat?.gl_account_id) debitAccountId = expCat.gl_account_id;
+        }
+        if (!debitAccountId) {
+          const { data: defaultExp } = await supabase.from("chart_of_accounts")
+            .select("id").eq("company_id", companyId).eq("account_type", "expense").limit(1).maybeSingle();
+          debitAccountId = defaultExp?.id || "";
+        }
+        jeDescription = `Petty Cash Expense: ${txn.description || txn.expense_category}`;
+      } else {
+        if (!debitAccountId) debitAccountId = fund.gl_account_id;
+        // Credit from bank or IOU
+        if (!creditAccountId && txn.expense_category === "IOU Cash Return") {
+          const { data: defaultAdv } = await supabase.from("chart_of_accounts")
+            .select("id").eq("company_id", companyId).eq("account_type", "asset").ilike("account_name", "%advance%").limit(1).maybeSingle();
+          creditAccountId = defaultAdv?.id || "";
+        }
+        if (!creditAccountId) {
+           const { data: glSettings } = await supabase.from("gl_settings" as any)
+            .select("bank_account_id").eq("company_id", companyId).maybeSingle();
+           creditAccountId = (glSettings as any)?.bank_account_id || "";
+        }
+        if (!creditAccountId) {
+          const { data: defaultBank } = await supabase.from("chart_of_accounts")
+            .select("id").eq("company_id", companyId).eq("account_type", "asset").ilike("account_name", "%bank%").limit(1).maybeSingle();
+          creditAccountId = defaultBank?.id || "";
+        }
+        jeDescription = `Petty Cash Replenishment/Return: ${txn.description || "Top-up"}`;
+      }
+
+      if (!debitAccountId || !creditAccountId) {
+        throw new Error("Cannot sync: Could not resolve valid debit and credit accounts.");
+      }
+
+      // Create JE
+      const { data: je, error: jeError } = await supabase.from("journal_entries").insert({
+        entry_number: `PC-SYNC-${Date.now()}`,
+        entry_date: txn.created_at ? txn.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+        description: jeDescription,
+        reference: txn.voucher_number || txn.receipt_number || `PC-TXN-${txn.id.slice(0,8)}`,
+        total_debit: amount,
+        total_credit: amount,
+        status: "posted",
+        company_id: companyId,
+        posted_at: new Date().toISOString(),
+      }).select().single();
+
+      if (jeError || !je) throw new Error("Failed to create journal entry");
+
+      // Lines
+      const { error: linesError } = await supabase.from("journal_entry_lines").insert([
+        { journal_entry_id: je.id, account_id: debitAccountId, description: jeDescription, debit: amount, credit: 0, company_id: companyId },
+        { journal_entry_id: je.id, account_id: creditAccountId, description: jeDescription, debit: 0, credit: amount, company_id: companyId }
+      ]);
+
+      if (linesError) {
+        // Rollback JE if lines failed
+        await supabase.from("journal_entries").delete().eq("id", je.id);
+        throw new Error(`Failed to create journal lines: ${linesError.message}`);
+      }
+
+      // Update COA
+      for (const acctId of [debitAccountId, creditAccountId]) {
+         const { data: acct } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", acctId).single();
+         if (acct) {
+            const isDebit = acctId === debitAccountId;
+            const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
+            const adjustment = isDebit ? (isDebitNormal ? amount : -amount) : (isDebitNormal ? -amount : amount);
+            await supabase.from("chart_of_accounts").update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() }).eq("id", acctId);
+         }
+      }
+
+      await supabase.from("petty_cash_transactions").update({ journal_entry_id: je.id }).eq("id", txn.id);
+      return { success: true, je_id: je.id };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-all-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      toast({ title: "Successfully Synced to GL", description: "The missing Journal Entry was created securely." });
+    },
+    onError: (e: any) => toast({ title: "Sync Failed", description: e.message, variant: "destructive" }),
   });
 };

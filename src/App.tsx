@@ -12,102 +12,105 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { PageAccessGuard } from "./components/auth/PageAccessGuard";
 import { SeasonalThemeProvider } from "./components/seasonal/SeasonalThemeProvider";
 import { CompanyProvider } from "./contexts/CompanyContext";
+import { CrewAuthProvider } from "./contexts/CrewAuthContext";
 import { ThemeProvider } from "next-themes";
 import { SystemErrorBoundary } from "./components/safety/SystemErrorBoundary";
 import { MFAGuard } from "./components/auth/MFAGuard";
 import { toast } from "sonner";
 import "@/styles/professional-erp.css";
 
-// Pages
+// Pages — Core (eagerly loaded for instant auth flow)
 import Auth from "./pages/Auth";
 import TwoFactorVerify from "./pages/TwoFactorVerify";
 import ResetPassword from "./pages/ResetPassword";
 import AcceptInvite from "./pages/AcceptInvite";
-import InstallApp from "./pages/InstallApp";
-import Welcome from "./pages/Welcome";
-import Profile from "./pages/Profile";
-import Settings from "./pages/Settings";
-import Dashboard from "./pages/Dashboard";
-import DailyTrips from "./pages/DailyTrips";
-const TripsAnalytics = React.lazy(() => import("./pages/TripsAnalytics"));
-import FleetManagement from "./pages/FleetManagement";
 import NotFound from "./pages/NotFound";
-import StaffManagement from "./pages/StaffManagement";
-import Insurance from "./pages/Insurance";
-import Maintenance from "./pages/Maintenance";
-import RoutePermits from "./pages/RoutePermits";
-import DriverTraining from "./pages/DriverTraining";
-import RealTimeTracking from "./pages/RealTimeTracking";
-import DriverAllocation from "./pages/DriverAllocation";
-import StaffAttendancePayroll from "./pages/StaffAttendancePayroll";
-import DocumentManager from "./pages/DocumentManager";
-import SpecialHire from "./pages/SpecialHire";
-import SchoolBusService from "./pages/SchoolBusService";
-import BranchDashboard from "./pages/BranchDashboard";
-import SchoolStudentDatabase from "./pages/SchoolStudentDatabase";
-import SchoolPayments from "./pages/SchoolPayments";
-import SchoolPaymentImport from "./pages/SchoolPaymentImport";
-import SchoolPaymentSettings from "./pages/SchoolPaymentSettings";
-import ReceiptUpload from "./pages/ReceiptUpload";
-import SchoolReports from "./pages/SchoolReports";
+import Welcome from "./pages/Welcome";
+
+// Pages — Lazy loaded (code-split per route for fast startup)
+const InstallApp = React.lazy(() => import("./pages/InstallApp"));
+const Profile = React.lazy(() => import("./pages/Profile"));
+const Settings = React.lazy(() => import("./pages/Settings"));
+const Dashboard = React.lazy(() => import("./pages/Dashboard"));
+const DailyTrips = React.lazy(() => import("./pages/DailyTrips"));
+const TripsAnalytics = React.lazy(() => import("./pages/TripsAnalytics"));
+const FleetManagement = React.lazy(() => import("./pages/FleetManagement"));
+const StaffManagement = React.lazy(() => import("./pages/StaffManagement"));
+const Insurance = React.lazy(() => import("./pages/Insurance"));
+const Maintenance = React.lazy(() => import("./pages/Maintenance"));
+const RoutePermits = React.lazy(() => import("./pages/RoutePermits"));
+const DriverTraining = React.lazy(() => import("./pages/DriverTraining"));
+const RealTimeTracking = React.lazy(() => import("./pages/RealTimeTracking"));
+const DriverAllocation = React.lazy(() => import("./pages/DriverAllocation"));
+const StaffAttendancePayroll = React.lazy(() => import("./pages/StaffAttendancePayroll"));
+const DocumentManager = React.lazy(() => import("./pages/DocumentManager"));
+const SpecialHire = React.lazy(() => import("./pages/SpecialHire"));
+const SchoolBusService = React.lazy(() => import("./pages/SchoolBusService"));
+const BranchDashboard = React.lazy(() => import("./pages/BranchDashboard"));
+const SchoolStudentDatabase = React.lazy(() => import("./pages/SchoolStudentDatabase"));
+const SchoolPayments = React.lazy(() => import("./pages/SchoolPayments"));
+const SchoolPaymentImport = React.lazy(() => import("./pages/SchoolPaymentImport"));
+const SchoolPaymentSettings = React.lazy(() => import("./pages/SchoolPaymentSettings"));
+const ReceiptUpload = React.lazy(() => import("./pages/ReceiptUpload"));
+const SchoolReports = React.lazy(() => import("./pages/SchoolReports"));
 const YutongQuotations = React.lazy(() => import("./pages/YutongQuotations"));
 const SinotruckQuotations = React.lazy(() => import("./pages/SinotruckQuotations"));
 const LightVehicleQuotations = React.lazy(() => import("./pages/LightVehicleQuotations"));
-import Complaints from "./pages/Complaints";
-import FeedbackModule from "./pages/FeedbackModule";
-import StaffPerformance from "./pages/StaffPerformance";
-import PublicComplaint from "./pages/PublicComplaint";
-import PublicSpecialHire from "./pages/PublicSpecialHire";
-import PublicReceiptUpload from "./pages/PublicReceiptUpload";
-import PublicConductorUpload from "./pages/PublicConductorUpload";
-import PublicDriverUpload from "./pages/PublicDriverUpload";
-import { ConductorSubmissionsReview } from "./components/trips/ConductorSubmissionsReview";
-import { LateEntryApprovalInterface } from "./components/trips/LateEntryApprovalInterface";
-import CrewLogin from "./pages/CrewLogin";
-import CrewAppLayout from "./components/layouts/CrewAppLayout";
-import { CrewAuthProvider } from "./contexts/CrewAuthContext";
-import CrewHistory from "./pages/CrewHistory";
-import CrewSchedule from "./pages/CrewSchedule";
-import CrewProfile from "./pages/CrewProfile";
-import CrewPerformance from "./pages/CrewPerformance";
-import CrewFinance from "./pages/CrewFinance";
-import SchoolImportPage from "./pages/SchoolImportPage";
-import SchoolBusExpenseImport from "./pages/SchoolBusExpenseImport";
-import CustomerManagement from "./pages/CustomerManagement";
-import AddStudentForm from "./pages/AddStudentForm";
-import SchoolRouteManagement from "./pages/SchoolRouteManagement";
-import SchoolReceiptManagement from "./pages/SchoolReceiptManagement";
+const Complaints = React.lazy(() => import("./pages/Complaints"));
+const FeedbackModule = React.lazy(() => import("./pages/FeedbackModule"));
+const StaffPerformance = React.lazy(() => import("./pages/StaffPerformance"));
+const PublicComplaint = React.lazy(() => import("./pages/PublicComplaint"));
+const PublicSpecialHire = React.lazy(() => import("./pages/PublicSpecialHire"));
+const PublicReceiptUpload = React.lazy(() => import("./pages/PublicReceiptUpload"));
+const PublicConductorUpload = React.lazy(() => import("./pages/PublicConductorUpload"));
+const PublicDriverUpload = React.lazy(() => import("./pages/PublicDriverUpload"));
+const ConductorSubmissionsReview = React.lazy(() => import("./components/trips/ConductorSubmissionsReview").then(m => ({ default: m.ConductorSubmissionsReview })));
+const LateEntryApprovalInterface = React.lazy(() => import("./components/trips/LateEntryApprovalInterface").then(m => ({ default: m.LateEntryApprovalInterface })));
+const CrewLogin = React.lazy(() => import("./pages/CrewLogin"));
+const CrewAppLayout = React.lazy(() => import("./components/layouts/CrewAppLayout"));
+const CrewHistory = React.lazy(() => import("./pages/CrewHistory"));
+const CrewSchedule = React.lazy(() => import("./pages/CrewSchedule"));
+const CrewProfile = React.lazy(() => import("./pages/CrewProfile"));
+const CrewPerformance = React.lazy(() => import("./pages/CrewPerformance"));
+const CrewFinance = React.lazy(() => import("./pages/CrewFinance"));
+const SchoolImportPage = React.lazy(() => import("./pages/SchoolImportPage"));
+const SchoolBusExpenseImport = React.lazy(() => import("./pages/SchoolBusExpenseImport"));
+const CustomerManagement = React.lazy(() => import("./pages/CustomerManagement"));
+const AddStudentForm = React.lazy(() => import("./pages/AddStudentForm"));
+const SchoolRouteManagement = React.lazy(() => import("./pages/SchoolRouteManagement"));
+const SchoolReceiptManagement = React.lazy(() => import("./pages/SchoolReceiptManagement"));
 const SchoolBranchReports = React.lazy(() => import("./pages/SchoolBranchReports"));
-import GlobalSchoolImport from "./pages/GlobalSchoolImport";
-import GlobalSchoolPayments from "./pages/GlobalSchoolPayments";
-import TotalDashboard from "./pages/TotalDashboard";
-import NSPDailySales from "./pages/NSPDailySales";
-import NSPSalesSummary from "./pages/NSPSalesSummary";
-import QuickTripsEntry from "./pages/QuickTripsEntry";
-import GovernanceCalendar from "./pages/GovernanceCalendar";
-import HolidayManagement from "./pages/HolidayManagement";
-import SeasonalThemes from "./pages/SeasonalThemes";
-import DailyBusExpenses from "./pages/DailyBusExpenses";
-import Accounting from "./pages/Accounting";
-import Budgeting from "./pages/Budgeting";
+const GlobalSchoolImport = React.lazy(() => import("./pages/GlobalSchoolImport"));
+const GlobalSchoolPayments = React.lazy(() => import("./pages/GlobalSchoolPayments"));
+const TotalDashboard = React.lazy(() => import("./pages/TotalDashboard"));
+const NSPDailySales = React.lazy(() => import("./pages/NSPDailySales"));
+const NSPSalesSummary = React.lazy(() => import("./pages/NSPSalesSummary"));
+const QuickTripsEntry = React.lazy(() => import("./pages/QuickTripsEntry"));
+const GovernanceCalendar = React.lazy(() => import("./pages/GovernanceCalendar"));
+const HolidayManagement = React.lazy(() => import("./pages/HolidayManagement"));
+const SeasonalThemes = React.lazy(() => import("./pages/SeasonalThemes"));
+const DailyBusExpenses = React.lazy(() => import("./pages/DailyBusExpenses"));
+const Accounting = React.lazy(() => import("./pages/Accounting"));
+const Budgeting = React.lazy(() => import("./pages/Budgeting"));
 const TyreManagement = React.lazy(() => import("./pages/TyreManagement"));
 const FleetAnalytics = React.lazy(() => import("./pages/FleetAnalytics"));
-import VehicleInquiryHub from "./pages/VehicleInquiryHub";
-import ScheduledTasks from "./pages/ScheduledTasks";
-import ApiUsageMonitoring from "./pages/ApiUsageMonitoring";
-import { VerifyHubView } from "./components/system-monitor/VerifyHubView";
+const VehicleInquiryHub = React.lazy(() => import("./pages/VehicleInquiryHub"));
+const ScheduledTasks = React.lazy(() => import("./pages/ScheduledTasks"));
+const ApiUsageMonitoring = React.lazy(() => import("./pages/ApiUsageMonitoring"));
+const VerifyHubView = React.lazy(() => import("./components/system-monitor/VerifyHubView").then(m => ({ default: m.VerifyHubView })));
 const ExecutiveDashboard = React.lazy(() => import("./pages/ExecutiveDashboard"));
-import SystemHealthDashboard from "./pages/SystemHealthDashboard";
-import Marketing from "./pages/Marketing";
-import CustomerPortal from "./pages/CustomerPortal";
-import VendorPortal from "./pages/VendorPortal";
-import WhatsAppHub from "./pages/WhatsAppHub";
-import SystemIssueTracker from "./pages/SystemIssueTracker";
-import PublicYutongReport from "./pages/PublicYutongReport";
-import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
-import RouteManagement from "./pages/RouteManagement";
-import MagiyaReports from "./pages/MagiyaReports";
-import PersonalDiary from "./pages/PersonalDiary";
+const SystemHealthDashboard = React.lazy(() => import("./pages/SystemHealthDashboard"));
+const Marketing = React.lazy(() => import("./pages/Marketing"));
+const CustomerPortal = React.lazy(() => import("./pages/CustomerPortal"));
+const VendorPortal = React.lazy(() => import("./pages/VendorPortal"));
+const WhatsAppHub = React.lazy(() => import("./pages/WhatsAppHub"));
+const SystemIssueTracker = React.lazy(() => import("./pages/SystemIssueTracker"));
+const PublicYutongReport = React.lazy(() => import("./pages/PublicYutongReport"));
+const PublicYutongSpreadsheet = React.lazy(() => import("./pages/PublicYutongSpreadsheet"));
+const RouteManagement = React.lazy(() => import("./pages/RouteManagement"));
+const MagiyaReports = React.lazy(() => import("./pages/MagiyaReports"));
+const PersonalDiary = React.lazy(() => import("./pages/PersonalDiary"));
+const HRHub = React.lazy(() => import("./pages/HRHub"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,10 +123,27 @@ const queryClient = new QueryClient({
     },
   },
   queryCache: new QueryCache({
-    onError: (error) => {
-      console.error("[Query System Error]:", error);
-      toast.error("Network issue detected. We are recovering your connection.");
-    },
+    onError: (() => {
+      // Throttle: only show one toast per 10 seconds
+      let lastToastTime = 0;
+      return (error: any) => {
+        console.error("[Query System Error]:", error);
+        const now = Date.now();
+        if (now - lastToastTime < 10_000) return; // Throttle
+        lastToastTime = now;
+
+        // Distinguish real network issues from schema/data errors
+        const msg = error?.message || "";
+        if (msg.includes("column") && msg.includes("does not exist")) {
+          toast.error("Data configuration error detected. Please contact support.", { duration: 5000 });
+        } else if (msg.includes("fetch") || msg.includes("network") || msg.includes("timeout") || msg.includes("Failed to fetch")) {
+          toast.error("Network issue detected. We are recovering your connection.");
+        } else {
+          // Suppress non-critical query errors from spamming the user
+          console.warn("[Query] Non-critical error suppressed from toast:", msg);
+        }
+      };
+    })(),
   }),
   mutationCache: new MutationCache({
     onError: (error) => {

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarIcon, User, Bus, Route, ArrowRight, ArrowLeft, Sun, Moon, CheckCircle, ChevronRight, Check, Plus, Minus, FileText, Banknote, Receipt, Navigation, PartyPopper, Sparkles, Loader2, Send, Calculator, Trash2, Upload, CreditCard, Camera, Lock, X } from "lucide-react";
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 import { GamificationBanner } from '@/components/trips/GamificationBanner';
@@ -31,6 +32,7 @@ const translations = {
     callBooking: "CALL BOOKING",
     agentBooking: "AGENT BOOKING",
     busCollection: "BUS COLLECTION",
+    magiyaCollection: "MAGIYA COLLECTION",
     luggage: "LUGGAGE INCOME",
     miscIncome: "MISCELLANEOUS INCOME",
     showAllExpenses: "Show All Expenses",
@@ -91,6 +93,7 @@ const translations = {
     callBooking: "දුරකථන ඇණවුම් (Call Booking)",
     agentBooking: "නියෝජිත ඇණවුම් (Agent Booking)",
     busCollection: "බස් එකතු කිරීම (Bus Collection)",
+    magiyaCollection: "මගිය එකතුව (Magiya Collection)",
     luggage: "ගමන් මලු ආදායම (Luggage Income)",
     miscIncome: "වෙනත් ආදායම් (Misc Income)",
     showAllExpenses: "සියලුම වියදම් පෙන්වන්න",
@@ -219,6 +222,7 @@ const translations = {
     callBooking: "தொலைபேசி முன்பதிவு (Call Booking)",
     agentBooking: "முகவர் முன்பதிவு (Agent Booking)",
     busCollection: "பேருந்து வசூல் (Bus Collection)",
+    magiyaCollection: "மகியா சேகரிப்பு (Magiya Collection)",
     luggage: "பொருட்கள் வருமானம் (Luggage)",
     miscIncome: "இதர வருமானம் (Misc Income)",
     showAllExpenses: "அனைத்து செலவுகளையும் காட்டு",
@@ -295,6 +299,7 @@ interface Trip {
     callBooking: string;
     agentBooking: string;
     busCollection: string;
+    magiyaCollection: string;
     luggage: string;
     miscIncome: string;
   };
@@ -447,7 +452,7 @@ export default function PublicConductorUpload() {
     const lastCompleted = completed.length > 0 ? completed[completed.length - 1] : null;
     return {
       id: '1', startOdo: lastCompleted?.endOdometer || '', endOdo: '',
-      income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' }
+      income: { callBooking: '', agentBooking: '', busCollection: '', magiyaCollection: '', luggage: '', miscIncome: '' }
     };
   });
 
@@ -458,12 +463,14 @@ export default function PublicConductorUpload() {
   // Fuel Details State
   const getCurrentTime = () => new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const [fuelDetails, setFuelDetails] = useState<any>(() => loadState('fuelDetails', {
-    time: getCurrentTime(), odometer: '', liters: '', paymentMethod: 'cash'
+    time: getCurrentTime(), odometer: '', liters: '', paymentMethod: ''
   }));
 
   const [completedTrips, setCompletedTrips] = useState<{tripNumber: number, total: number, time: string, endOdometer?: string}[]>(() => loadState('completedTrips', []));
   const [maxTrips, setMaxTrips] = useState(() => loadState('maxTrips', 4));
   const [overrideRequested, setOverrideRequested] = useState(() => loadState('overrideRequested', false));
+  const [submittedCategories, setSubmittedCategories] = useState<{trip: boolean, fuel: boolean, expenses: boolean}>(() => loadState('submitted_categories', { trip: false, fuel: false, expenses: false }));
+  const [submittedAmounts, setSubmittedAmounts] = useState<{tripTotal: number, fuelTotal: number, expenseTotal: number}>(() => loadState('submitted_amounts', { tripTotal: 0, fuelTotal: 0, expenseTotal: 0 }));
 
   // Auto-save Effect
   useEffect(() => {
@@ -475,8 +482,55 @@ export default function PublicConductorUpload() {
       localStorage.setItem('conductor_form_completedTrips', JSON.stringify(completedTrips));
       localStorage.setItem('conductor_form_maxTrips', JSON.stringify(maxTrips));
       localStorage.setItem('conductor_form_overrideRequested', JSON.stringify(overrideRequested));
+      localStorage.setItem('conductor_form_submitted_categories', JSON.stringify(submittedCategories));
+      localStorage.setItem('conductor_form_submitted_amounts', JSON.stringify(submittedAmounts));
     }
-  }, [formData, trip, expenses, fuelDetails, completedTrips, maxTrips, overrideRequested, submitted]);
+  }, [formData, trip, expenses, fuelDetails, completedTrips, maxTrips, overrideRequested, submitted, submittedCategories, submittedAmounts]);
+
+  // Reusable function to clear all form data (used by 24-hour refresh and manual "New Sheet")
+  const clearAllFormData = (showToastMsg = true) => {
+    localStorage.removeItem('conductor_form_global');
+    localStorage.removeItem('conductor_form_current_trip');
+    localStorage.removeItem('conductor_form_expenses');
+    localStorage.removeItem('conductor_form_fuelDetails');
+    localStorage.removeItem('conductor_form_completedTrips');
+    localStorage.removeItem('conductor_form_maxTrips');
+    localStorage.removeItem('conductor_form_overrideRequested');
+    localStorage.removeItem('conductor_form_submitted_categories');
+    localStorage.removeItem('conductor_form_submitted_amounts');
+    setFormData({ driverName: '', conductorName: crewMember?.staff_name || '', busNumber: '', routeName: '', tripDate: new Date().toISOString().split('T')[0] });
+    setCompletedTrips([]);
+    setExpenses({});
+    setFuelDetails({ time: getCurrentTime(), odometer: '', liters: '', paymentMethod: '' });
+    setCurrentTripNumber(1);
+    setMaxTrips(4);
+    setOverrideRequested(false);
+    setSubmittedCategories({ trip: false, fuel: false, expenses: false });
+    setSubmittedAmounts({ tripTotal: 0, fuelTotal: 0, expenseTotal: 0 });
+    setTrip({ id: Date.now().toString(), startOdo: '', endOdo: '', income: { callBooking: '', agentBooking: '', busCollection: '', magiyaCollection: '', luggage: '', miscIncome: '' } });
+    localStorage.setItem('conductor_form_session_start', Date.now().toString());
+    localStorage.setItem('conductor_form_session_date', new Date().toISOString().split('T')[0]);
+    if (showToastMsg) {
+      toast({ title: '🔄 New Day, Fresh Sheet!', description: 'Previous data cleared. Start your new day\'s entries.' });
+    }
+  };
+
+  // 24-Hour Auto-Refresh: Clear form if session expired or new calendar day
+  useEffect(() => {
+    const sessionStart = localStorage.getItem('conductor_form_session_start');
+    const today = new Date().toISOString().split('T')[0];
+    if (sessionStart) {
+      const elapsed = Date.now() - parseInt(sessionStart);
+      const hoursElapsed = elapsed / (1000 * 60 * 60);
+      const storedDate = localStorage.getItem('conductor_form_session_date');
+      if (hoursElapsed >= 24 || (storedDate && storedDate !== today)) {
+        clearAllFormData(true);
+      }
+    } else {
+      localStorage.setItem('conductor_form_session_start', Date.now().toString());
+      localStorage.setItem('conductor_form_session_date', today);
+    }
+  }, []);
 
   // QR Code URL Parameter Parsing
   useEffect(() => {
@@ -816,11 +870,23 @@ export default function PublicConductorUpload() {
 
         localStorage.removeItem('conductor_form_current_trip');
         setCurrentTripNumber(prev => prev + 1); // Increment trip number for next time
-        setTrip({ id: Date.now().toString(), startOdo: trip.endOdo, endOdo: '', income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' } });
+        setTrip({ id: Date.now().toString(), startOdo: trip.endOdo, endOdo: '', income: { callBooking: '', agentBooking: '', busCollection: '', magiyaCollection: '', luggage: '', miscIncome: '' } });
       } else if (submissionType === 'fuel') {
         localStorage.removeItem('conductor_form_fuelDetails');
       } else if (submissionType === 'expenses') {
         localStorage.removeItem('conductor_form_expenses');
+      }
+
+      // Track submitted categories to prevent re-submission
+      const catKey = submissionType === 'trip_revenue' ? 'trip' : submissionType;
+      if (submissionType === 'fuel') {
+        setSubmittedCategories(prev => ({ ...prev, fuel: true }));
+        setSubmittedAmounts(prev => ({ ...prev, fuelTotal: parseFloat(expenses['fuel_cost']) || 0 }));
+      } else if (submissionType === 'expenses') {
+        setSubmittedCategories(prev => ({ ...prev, expenses: true }));
+        setSubmittedAmounts(prev => ({ ...prev, expenseTotal: totalExpenses }));
+      } else if (submissionType === 'trip_revenue') {
+        setSubmittedAmounts(prev => ({ ...prev, tripTotal: prev.tripTotal + totalIncome }));
       }
 
       toast({ title: t.successTitle, description: t.successDesc });
@@ -851,6 +917,7 @@ export default function PublicConductorUpload() {
           call_booking: parseFloat(trip.income.callBooking) || 0,
           agent_booking: parseFloat(trip.income.agentBooking) || 0,
           bus_collection: parseFloat(trip.income.busCollection) || 0,
+          magiya_collection: parseFloat(trip.income.magiyaCollection) || 0,
           luggage_income: parseFloat(trip.income.luggage) || 0,
           miscellaneous_income: parseFloat(trip.income.miscIncome) || 0,
           total: totalIncome
@@ -988,7 +1055,7 @@ export default function PublicConductorUpload() {
               >
                 <span className="flex items-center gap-2 text-blue-200 text-sm font-medium">
                   {hour < 12 ? <Sun className="w-4 h-4" /> : hour < 18 ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                  NCG Speed Crew
+                  NCG LIFE
                 </span>
                 <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-sm">
                   {currentStep === 'hub' ? displayGreeting : currentStep === 'trip' ? 'Trip Revenue' : currentStep === 'fuel' ? 'Fuel Entry' : 'Expenses'}
@@ -1215,8 +1282,22 @@ export default function PublicConductorUpload() {
                       </div>
                     </div>
                   )}
-                  <div className={`space-y-3 ${fetchingAssignment ? 'opacity-40 pointer-events-none' : ''}`}>
-                    <button 
+                  <motion.div 
+                    initial="hidden"
+                    animate="visible"
+                    variants={{
+                      hidden: { opacity: 0 },
+                      visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+                    }}
+                    className={`space-y-3 ${fetchingAssignment ? 'opacity-40 pointer-events-none' : ''}`}
+                  >
+                    <motion.button 
+                      variants={{
+                        hidden: { opacity: 0, y: 20 },
+                        visible: { opacity: 1, y: 0 }
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => { 
                         if (!validateGlobalFields()) return; 
                         if (completedTrips.length >= maxTrips) {
@@ -1241,41 +1322,106 @@ export default function PublicConductorUpload() {
                         </div>
                       </div>
                       <Navigation className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 transition-colors transform group-hover:translate-x-1" />
-                    </button>
+                    </motion.button>
 
-                    <button 
-                      onClick={() => { if (validateGlobalFields()) setCurrentStep('fuel'); }}
-                      className="w-full bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between hover:border-orange-200 hover:shadow-md transition-all group"
+                    <motion.button 
+                      variants={{
+                        hidden: { opacity: 0, y: 20 },
+                        visible: { opacity: 1, y: 0 }
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => { 
+                        if (submittedCategories.fuel) {
+                          toast({ title: 'Already Submitted', description: 'Fuel details already submitted for today. Start a new sheet if needed.', variant: 'destructive' });
+                          return;
+                        }
+                        if (validateGlobalFields()) setCurrentStep('fuel'); 
+                      }}
+                      className={`w-full p-5 rounded-[1.5rem] border shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between transition-all group ${submittedCategories.fuel ? 'bg-orange-50 border-orange-200 opacity-70 cursor-not-allowed' : 'bg-white border-slate-100 hover:border-orange-200 hover:shadow-md'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center group-hover:bg-orange-100 transition-colors">
-                          <Banknote className="w-6 h-6" />
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${submittedCategories.fuel ? 'bg-orange-100 text-orange-600' : 'bg-orange-50 text-orange-600 group-hover:bg-orange-100'}`}>
+                          {submittedCategories.fuel ? <CheckCircle className="w-6 h-6" /> : <Banknote className="w-6 h-6" />}
                         </div>
                         <div className="text-left">
-                          <h4 className="font-bold text-lg text-slate-800">{lang === 'si' ? 'ඉන්ධන' : 'Fuel Details'}</h4>
-                          <p className="text-xs text-slate-500 font-medium">Record diesel and pumping details</p>
+                          <h4 className={`font-bold text-lg ${submittedCategories.fuel ? 'text-orange-700' : 'text-slate-800'}`}>{lang === 'si' ? 'ඉන්ධන' : 'Fuel Details'}</h4>
+                          <p className="text-xs font-medium text-slate-500">
+                            {submittedCategories.fuel ? `✅ Submitted — Rs. ${submittedAmounts.fuelTotal.toFixed(2)}` : 'Record diesel and pumping details'}
+                          </p>
                         </div>
                       </div>
-                      <Navigation className="w-5 h-5 text-slate-300 group-hover:text-orange-500 transition-colors transform group-hover:translate-x-1" />
-                    </button>
+                      <Navigation className={`w-5 h-5 transition-colors transform group-hover:translate-x-1 ${submittedCategories.fuel ? 'text-orange-400' : 'text-slate-300 group-hover:text-orange-500'}`} />
+                    </motion.button>
 
-                    <button 
-                      onClick={() => { if (validateGlobalFields()) setCurrentStep('expenses'); }}
-                      className="w-full bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between hover:border-rose-200 hover:shadow-md transition-all group"
+                    <motion.button 
+                      variants={{
+                        hidden: { opacity: 0, y: 20 },
+                        visible: { opacity: 1, y: 0 }
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => { 
+                        if (submittedCategories.expenses) {
+                          toast({ title: 'Already Submitted', description: 'Expenses already submitted for today. Start a new sheet if needed.', variant: 'destructive' });
+                          return;
+                        }
+                        if (validateGlobalFields()) setCurrentStep('expenses'); 
+                      }}
+                      className={`w-full p-5 rounded-[1.5rem] border shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between transition-all group ${submittedCategories.expenses ? 'bg-rose-50 border-rose-200 opacity-70 cursor-not-allowed' : 'bg-white border-slate-100 hover:border-rose-200 hover:shadow-md'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center group-hover:bg-rose-100 transition-colors">
-                          <Receipt className="w-6 h-6" />
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${submittedCategories.expenses ? 'bg-rose-100 text-rose-600' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-100'}`}>
+                          {submittedCategories.expenses ? <CheckCircle className="w-6 h-6" /> : <Receipt className="w-6 h-6" />}
                         </div>
                         <div className="text-left">
-                          <h4 className="font-bold text-lg text-slate-800">{lang === 'si' ? 'වියදම්' : t.expenses}</h4>
-                          <p className="text-xs text-slate-500 font-medium">Record daily operational costs</p>
+                          <h4 className={`font-bold text-lg ${submittedCategories.expenses ? 'text-rose-700' : 'text-slate-800'}`}>{lang === 'si' ? 'වියදම්' : t.expenses}</h4>
+                          <p className="text-xs font-medium text-slate-500">
+                            {submittedCategories.expenses ? `✅ Submitted — Rs. ${submittedAmounts.expenseTotal.toFixed(2)}` : 'Record daily operational costs'}
+                          </p>
                         </div>
                       </div>
-                      <Navigation className="w-5 h-5 text-slate-300 group-hover:text-rose-500 transition-colors transform group-hover:translate-x-1" />
-                    </button>
+                      <Navigation className={`w-5 h-5 transition-colors transform group-hover:translate-x-1 ${submittedCategories.expenses ? 'text-rose-400' : 'text-slate-300 group-hover:text-rose-500'}`} />
+                    </motion.button>
 
-                  </div>
+                  </motion.div>
+
+                  {/* Cash Settlement Dashboard */}
+                  {(submittedCategories.trip || submittedCategories.fuel || submittedCategories.expenses) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-[1.5rem] p-5 shadow-sm mt-6 mb-2"
+                    >
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
+                        <h3 className="font-bold text-slate-800 text-lg">Cash Settlement (මුදල් පියවීම)</h3>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center text-sm font-semibold text-slate-600">
+                          <span>Total Cash Collected (ආදායම)</span>
+                          <span className="text-emerald-600">Rs. {(submittedAmounts.tripTotal || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm font-semibold text-slate-600">
+                          <span>Less: Total Expenses (වියදම්)</span>
+                          <span className="text-rose-600">- Rs. {(submittedAmounts.expenseTotal || 0).toFixed(2)}</span>
+                        </div>
+                        {(fuelDetails.paymentMethod === 'card' && submittedCategories.expenses) && (
+                          <div className="flex justify-between items-center text-sm font-semibold text-slate-600">
+                            <span>Add: Fuel Paid by Card (කාඩ්පත් ගෙවීම්)</span>
+                            <span className="text-blue-600">+ Rs. {(parseFloat(expenses['fuel_cost']) || 0).toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="pt-3 border-t border-blue-200 flex justify-between items-center">
+                          <span className="font-black text-slate-800 text-base">Net Cash to Settle</span>
+                          <span className="font-black text-blue-700 text-xl">
+                            Rs. {((submittedAmounts.tripTotal || 0) - ((submittedAmounts.expenseTotal || 0) - (fuelDetails.paymentMethod === 'card' && submittedCategories.expenses ? (parseFloat(expenses['fuel_cost']) || 0) : 0))).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
 
                   {/* Start New Sheet Button */}
                   <div className="flex justify-center pt-4 pb-4">
@@ -1283,20 +1429,7 @@ export default function PublicConductorUpload() {
                       variant="ghost" 
                       onClick={() => {
                         if (window.confirm("Are you sure you want to start a new sheet? This will clear your current local data so you can enter a new bus or date.")) {
-                          localStorage.removeItem('conductor_form_global');
-                          localStorage.removeItem('conductor_form_current_trip');
-                          localStorage.removeItem('conductor_form_expenses');
-                          localStorage.removeItem('conductor_form_fuelDetails');
-                          localStorage.removeItem('conductor_form_completedTrips');
-                          localStorage.removeItem('conductor_form_maxTrips');
-                          localStorage.removeItem('conductor_form_overrideRequested');
-                          setFormData({ driverName: '', conductorName: crewMember?.staff_name || '', busNumber: '', routeName: '', tripDate: new Date().toISOString().split('T')[0] });
-                          setCompletedTrips([]);
-                          setExpenses({});
-                          setFuelDetails({ time: getCurrentTime(), odometer: '', liters: '', paymentMethod: 'cash' });
-                          setCurrentTripNumber(1);
-                          setMaxTrips(4);
-                          setOverrideRequested(false);
+                          clearAllFormData();
                           toast({ title: "New Sheet Started", description: "You can now enter data for a new bus or date." });
                         }
                       }}
@@ -1398,6 +1531,49 @@ export default function PublicConductorUpload() {
                           </div>
                         </div>
 
+                        {/* Magiya Collection - Orange Section */}
+                        <div className="space-y-2 bg-gradient-to-br from-orange-50 to-amber-50/50 rounded-xl p-4 border border-orange-300 shadow-sm relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-200/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+                          <div className="relative z-10">
+                            <div className="flex flex-col items-start mb-3 pb-3 border-b border-orange-200/60">
+                              <div className="flex justify-between items-center w-full">
+                                <h4 className="text-3xl font-black bg-gradient-to-r from-orange-600 to-red-500 bg-clip-text text-transparent pb-1"
+                                    style={{ 
+                                      fontFamily: lang === 'si' ? "'Abhaya Libre', serif" : lang === 'ta' ? "'Kavivanar', cursive" : "'Caveat', cursive", 
+                                      letterSpacing: lang === 'en' ? '0.5px' : 'normal',
+                                      lineHeight: '1.2'
+                                    }}>
+                                  {lang === 'si' ? 'මගිය එකතුව' : lang === 'ta' ? 'மகியா சேகரிப்பு' : 'Magiya Collection'}
+                                </h4>
+                                <span className="text-sm font-bold bg-gradient-to-r from-orange-500 to-red-500 px-2.5 py-1 rounded-md text-white shadow-sm whitespace-nowrap ml-2">
+                                  Rs. {(parseFloat(trip.income?.magiyaCollection) || 0).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between py-2">
+                                <div className="flex flex-col">
+                                  <Label className="text-[20px] font-bold text-orange-900"
+                                         style={{ fontFamily: lang === 'si' ? "'Abhaya Libre', serif" : lang === 'ta' ? "'Kavivanar', cursive" : "'Caveat', cursive" }}>
+                                    {lang === 'si' ? 'මගිය එකතුව' : lang === 'ta' ? 'மகியா சேகரிப்பு' : 'Magiya Collection'}
+                                  </Label>
+                                  {lang !== 'en' && <span className="text-[10px] font-semibold text-orange-600/70 uppercase tracking-wider">Magiya Collection</span>}
+                                </div>
+                                <div className="relative w-32">
+                                  <Input 
+                                    type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
+                                    className="h-10 text-right font-bold text-orange-950 bg-white/80 focus-visible:ring-orange-500 border-orange-200 shadow-sm" 
+                                    value={trip.income?.magiyaCollection || ''} 
+                                    onChange={(e) => updateTripIncome('magiyaCollection', e.target.value)} 
+                                    onFocus={(e) => e.target.select()}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Other Income (Separated) - Creative Design */}
                         <div className="space-y-2 bg-gradient-to-br from-fuchsia-50 to-purple-50/50 rounded-xl p-4 border border-fuchsia-200 shadow-sm relative overflow-hidden">
                           <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-200/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
@@ -1455,6 +1631,10 @@ export default function PublicConductorUpload() {
                           <span className="text-xs font-semibold text-slate-500 uppercase">Total Passenger Revenue</span>
                           <span className="text-sm font-bold text-slate-700">Rs. {((parseFloat(trip.income?.busCollection) || 0) + (parseFloat(trip.income?.callBooking) || 0) + (parseFloat(trip.income?.agentBooking) || 0)).toFixed(2)}</span>
                         </div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-semibold text-orange-500 uppercase">Magiya Collection</span>
+                          <span className="text-sm font-bold text-orange-700">Rs. {(parseFloat(trip.income?.magiyaCollection) || 0).toFixed(2)}</span>
+                        </div>
                         <div className="flex justify-between items-center mb-3">
                           <span className="text-xs font-semibold text-indigo-500 uppercase">Total Other Income</span>
                           <span className="text-sm font-bold text-indigo-700">Rs. {((parseFloat(trip.income?.luggage) || 0) + (parseFloat(trip.income?.miscIncome) || 0)).toFixed(2)}</span>
@@ -1462,7 +1642,7 @@ export default function PublicConductorUpload() {
                         <div className="flex justify-between items-end pt-3 border-t border-slate-100">
                           <div className="space-y-1">
                             <span className="block font-black text-slate-800 text-sm">Grand Total</span>
-                            <span className="block text-[10px] uppercase font-bold tracking-wider text-slate-400">Passenger + Other Income</span>
+                            <span className="block text-[10px] uppercase font-bold tracking-wider text-slate-400">Passenger + Magiya + Other Income</span>
                           </div>
                           <span className="font-black text-emerald-600 text-2xl tracking-tight">Rs. {totalIncome.toFixed(2)}</span>
                         </div>
@@ -1500,65 +1680,77 @@ export default function PublicConductorUpload() {
                       <div className="w-1.5 h-5 bg-orange-500 rounded-full" />
                       <h3 className="font-bold text-slate-800">{t.fuelDetails}</h3>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-3 bg-orange-50/50 p-3 rounded-lg border border-orange-100/50">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-600 flex justify-between">
-                          {t.fuelTime}
-                          <button type="button" onClick={() => setFuelDetails({...fuelDetails, time: getCurrentTime()})} className="text-[10px] text-blue-600 hover:underline">Now</button>
-                        </Label>
-                        <Input type="time" value={fuelDetails.time || ''} onChange={e => setFuelDetails({...fuelDetails, time: e.target.value})} className="h-9 bg-white" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-600">{t.fuelOdo}</Label>
-                        <Input type="number" inputMode="decimal" placeholder="0" value={fuelDetails.odometer || ''} onChange={e => setFuelDetails({...fuelDetails, odometer: e.target.value})} className="h-9 bg-white" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-600">{t.fuelCost}</Label>
-                        <Input 
-                          type="number" 
-                          inputMode="decimal" 
-                          placeholder="0.00" 
-                          value={expenses['fuel_cost'] || ''} 
-                          onChange={e => setExpenses({...expenses, fuel_cost: e.target.value})} 
-                          className="h-9 bg-white" 
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-600">{t.fuelLiters} (Auto)</Label>
-                        <Input 
-                          type="number" 
-                          inputMode="decimal" 
-                          placeholder="0.0" 
-                          value={fuelDetails.liters || ''} 
-                          disabled
-                          className="h-9 bg-slate-100 text-slate-500 cursor-not-allowed" 
-                        />
-                      </div>
-                    </div>
 
+                    {/* Step 1: Payment Method MUST be selected first */}
                     <div className="space-y-2">
-                      <Label className="text-xs font-bold text-slate-600">{t.fuelPayment}</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div 
-                          onClick={() => setFuelDetails({...fuelDetails, paymentMethod: 'cash'})}
-                          className={`flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${fuelDetails.paymentMethod === 'cash' ? 'bg-orange-100 border-orange-300 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
-                        >
-                          <Banknote className="w-4 h-4" /> {t.cash}
-                        </div>
-                        <div 
-                          onClick={() => setFuelDetails({...fuelDetails, paymentMethod: 'card'})}
-                          className={`flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${fuelDetails.paymentMethod === 'card' ? 'bg-orange-100 border-orange-300 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
-                        >
-                          <CreditCard className="w-4 h-4" /> {t.card}
-                        </div>
-                      </div>
+                      <Label className="text-xs font-bold text-slate-600">{t.fuelPayment} <span className="text-rose-500">*</span></Label>
+                      <Select 
+                        value={fuelDetails.paymentMethod || ''} 
+                        onValueChange={(val: 'cash'|'card') => setFuelDetails({...fuelDetails, paymentMethod: val})}
+                      >
+                        <SelectTrigger className={`w-full h-12 rounded-xl transition-all ${fuelDetails.paymentMethod ? 'bg-orange-50 border-orange-200 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                          <SelectValue placeholder="Select Payment Method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">
+                            <div className="flex items-center gap-2"><Banknote className="w-4 h-4 text-orange-600" /> {t.cash}</div>
+                          </SelectItem>
+                          <SelectItem value="card">
+                            <div className="flex items-center gap-2"><CreditCard className="w-4 h-4 text-orange-600" /> {t.card}</div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    <Button type="submit" disabled={loading} className="w-full h-12 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl shadow-md mt-4">
-                      {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
-                      {t.submitFuel}
-                    </Button>
+                    {/* Step 2: Show details ONLY after payment method is selected */}
+                    {fuelDetails.paymentMethod && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="space-y-4 pt-2"
+                      >
+                        <div className="grid grid-cols-2 gap-3 bg-orange-50/50 p-3 rounded-lg border border-orange-100/50">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600 flex justify-between">
+                              {t.fuelTime}
+                              <button type="button" onClick={() => setFuelDetails({...fuelDetails, time: getCurrentTime()})} className="text-[10px] text-blue-600 hover:underline">Now</button>
+                            </Label>
+                            <Input type="time" value={fuelDetails.time || ''} onChange={e => setFuelDetails({...fuelDetails, time: e.target.value})} className="h-9 bg-white" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600">{t.fuelOdo}</Label>
+                            <Input type="number" inputMode="decimal" placeholder="0" value={fuelDetails.odometer || ''} onChange={e => setFuelDetails({...fuelDetails, odometer: e.target.value})} className="h-9 bg-white" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600">{t.fuelCost}</Label>
+                            <Input 
+                              type="number" 
+                              inputMode="decimal" 
+                              placeholder="0.00" 
+                              value={expenses['fuel_cost'] || ''} 
+                              onChange={e => setExpenses({...expenses, fuel_cost: e.target.value})} 
+                              className="h-9 bg-white" 
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-600">{t.fuelLiters} (Auto)</Label>
+                            <Input 
+                              type="number" 
+                              inputMode="decimal" 
+                              placeholder="0.0" 
+                              value={fuelDetails.liters || ''} 
+                              disabled
+                              className="h-9 bg-slate-100 text-slate-500 cursor-not-allowed" 
+                            />
+                          </div>
+                        </div>
+                        
+                        <Button type="submit" disabled={loading} className="w-full h-12 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl shadow-md mt-4">
+                          {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
+                          {t.submitFuel}
+                        </Button>
+                      </motion.div>
+                    )}
                   </form>
                 </motion.div>
               )}

@@ -539,7 +539,7 @@ const commercialBankFormat: BankFormat = {
         chequeNumber: String(row[chequeCol || ''] || '').trim() || undefined,
         rawRow: row,
       };
-    }).filter(t => t.description && (t.debit > 0 || t.credit > 0));
+    }).filter(t => t.debit > 0 || t.credit > 0);
   },
   extractMeta: (rows, headers) => {
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance');
@@ -589,7 +589,7 @@ const sampathBankFormat: BankFormat = {
         chequeNumber: String(row[chequeCol || ''] || '').trim() || undefined,
         rawRow: row,
       };
-    }).filter(t => t.description && (t.debit > 0 || t.credit > 0));
+    }).filter(t => t.debit > 0 || t.credit > 0);
   },
   extractMeta: (rows, headers) => {
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance');
@@ -647,6 +647,60 @@ const peoplesBankFormat: BankFormat = {
   }),
 };
 
+// --- COMMERCIAL BANK PDF CONVERTED ---
+const commercialPdfConvertedFormat: BankFormat = {
+  id: 'commercial_pdf_converted',
+  name: 'Commercial Bank (PDF to Excel)',
+  detect: (headers: string[], rows: any[]) => {
+    const hstr = headers.join('').toLowerCase();
+    return hstr.includes('transaction d') && hstr.includes('__empty');
+  },
+  parse: (rows: any[], headers: string[]) => {
+    const dateCol = headers[0] || 'Transaction Date';
+    const descCol = headers[1] || 'Transaction Description';
+    
+    return rows.map((row, idx) => {
+      // In XLSX PDF conversions, empty headers become __EMPTY, __EMPTY_1, etc.
+      // Based on layout: Col C (Debit) = __EMPTY, Col D (Credit) = __EMPTY_1
+      const debit = cleanAmount(row['__EMPTY']);
+      const credit = cleanAmount(row['__EMPTY_1']);
+      
+      // Balance is usually the last column or one with 'Cr'/'Dr' (e.g. __EMPTY_3 or __EMPTY_2)
+      let balanceStr = '';
+      const emptyKeys = Object.keys(row).filter(k => k.startsWith('__EMPTY'));
+      if (emptyKeys.length > 0) {
+        // First try to find one containing Cr or Dr
+        const crDrKey = emptyKeys.find(k => String(row[k]).includes('Cr') || String(row[k]).includes('Dr'));
+        if (crDrKey) {
+          balanceStr = String(row[crDrKey]);
+        } else {
+          // Fallback to the last available column
+          balanceStr = String(row[emptyKeys[emptyKeys.length - 1]]);
+        }
+      }
+
+      return {
+        rowNumber: idx + 2,
+        txnDate: parseDate(row[dateCol]),
+        description: String(row[descCol] || '').trim(),
+        reference: '', // usually no distinct reference column in this PDF layout
+        debit,
+        credit,
+        balance: cleanAmount(balanceStr),
+        type: (debit > 0 ? 'payment' : 'deposit') as 'payment' | 'deposit',
+        rawRow: row,
+      };
+    }).filter(t => t.debit > 0 || t.credit > 0);
+  },
+  extractMeta: (rows, headers) => {
+    return {
+      bankName: 'Commercial Bank (PDF Converted)',
+      openingBalance: 0,
+      closingBalance: 0,
+    };
+  },
+};
+
 // --- GENERIC FORMAT (fallback) ---
 const genericFormat: BankFormat = {
   id: 'generic',
@@ -677,7 +731,7 @@ const genericFormat: BankFormat = {
         chequeNumber: String(row[chequeCol || ''] || '').trim() || undefined,
         rawRow: row,
       };
-    }).filter(t => t.description && (t.debit > 0 || t.credit > 0));
+    }).filter(t => t.debit > 0 || t.credit > 0);
   },
   extractMeta: (rows, headers) => {
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance');
@@ -692,6 +746,7 @@ const genericFormat: BankFormat = {
 
 // =========== ALL BANK FORMATS (ordered by specificity) ===========
 export const BANK_FORMATS: BankFormat[] = [
+  commercialPdfConvertedFormat,
   commercialBankFormat,
   sampathBankFormat,
   hnbFormat,

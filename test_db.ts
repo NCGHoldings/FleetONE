@@ -1,38 +1,15 @@
-import { supabase } from './src/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
 
 async function run() {
-  const { data: order } = await supabase
-    .from('yutong_orders')
-    .select('*, yutong_quotations(*)')
-    .eq('order_no', 'YTO-2026-0043')
-    .single();
-  
-  console.log('Order:', order);
+  const { data: settings } = await supabase.from('school_bus_finance_settings').select('branch_id, fuel_expense_account_id, chart_of_accounts!school_bus_finance_settings_fuel_expense_account_id_fkey(account_name, account_type)');
+  console.log("Finance Settings:", JSON.stringify(settings, null, 2));
 
-  if (order) {
-    const { data: invoices } = await supabase
-      .from('yutong_invoice_records')
-      .select('*')
-      .eq('order_id', order.id);
-    console.log('Invoices:', invoices);
-
-    if (order.ar_invoice_id) {
-        const { data: arInvoice } = await supabase
-        .from('ar_invoices')
-        .select('*')
-        .eq('id', order.ar_invoice_id);
-        console.log('AR Invoices linked:', arInvoice);
-    } else {
-        console.log('No AR Invoice linked to order.');
-        
-        // Let's check if any AR invoice exists for this order regardless of link
-        const { data: arByOrder } = await supabase
-        .from('ar_invoices')
-        .select('*')
-        .eq('source_reference_id', order.id);
-        console.log('AR Invoices by source_reference_id:', arByOrder);
-    }
-  }
+  const { data: account } = await supabase.from('chart_of_accounts').select('id, account_code, account_name, account_type').eq('account_code', '13005002');
+  console.log("Account 13005002:", JSON.stringify(account, null, 2));
 }
 
-run().catch(console.error);
+run();

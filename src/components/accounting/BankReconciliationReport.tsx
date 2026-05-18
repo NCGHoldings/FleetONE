@@ -40,7 +40,7 @@ interface BankReconciliationReportProps {
   statementDate: string;
   statementNo: string;
   statementBalance: number;
-  lastStatementBalance: number;
+  statementOpeningBalance: number;
   clearedState: ClearedState;
   transactions: any[];
   adjustments: Adjustment[];
@@ -70,7 +70,7 @@ export const BankReconciliationReport = ({
   statementDate,
   statementNo,
   statementBalance,
-  lastStatementBalance,
+  statementOpeningBalance,
   clearedState,
   transactions,
   adjustments,
@@ -82,6 +82,9 @@ export const BankReconciliationReport = ({
   const clearedTransactions = transactions.filter(
     (t) => clearedState[t.id]?.cleared
   );
+
+  const clearedDeposits = clearedTransactions.filter(t => (t.debit_amount || 0) > 0);
+  const clearedPayments = clearedTransactions.filter(t => (t.credit_amount || 0) > 0);
 
   const unclearedDeposits = transactions.filter(
     (t) =>
@@ -106,12 +109,8 @@ export const BankReconciliationReport = ({
     (sum, t) => sum + (t.credit_amount || 0), 0
   );
 
-  const adjustedBankBalance =
-    statementBalance + totalDepositsInTransit - totalOutstandingChecks;
-
   const adjustedBookBalance = summary.clearedBookBalance;
   const difference = adjustedBookBalance - statementBalance;
-  const isReconciled = Math.abs(summary.difference) < 0.01;
 
   const handlePrint = () => {
     window.print();
@@ -121,7 +120,7 @@ export const BankReconciliationReport = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] max-h-[90vh] overflow-y-auto p-0 recon-report-dialog">
+      <DialogContent className="max-w-[1000px] max-h-[90vh] overflow-y-auto p-0 recon-report-dialog">
         {/* ---- Print-only styles ---- */}
         <style>{`
           @media print {
@@ -169,327 +168,195 @@ export const BankReconciliationReport = ({
         </div>
 
         {/* =================== REPORT BODY =================== */}
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-10 py-8 space-y-8 text-sm">
 
-          {/* --- Report Header --- */}
-          <div className="text-center border-b pb-5">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <Building2 className="w-5 h-5 text-primary" />
-              <h1 className="text-lg font-bold tracking-tight">
-                {selectedCompany?.name || "Company"}
-              </h1>
+          {/* --- SAP B1 Style Report Header --- */}
+          <div className="flex justify-between items-start border-b pb-6">
+            <div>
+               <h1 className="text-2xl font-bold tracking-tight text-blue-900 mb-6">
+                  Bank Reconciliation Report
+               </h1>
+               <div className="space-y-1">
+                  <div className="flex"><strong className="w-44">G/L Account:</strong> <span>{bankAccount.account_number} ( {bankAccount.account_name} )</span></div>
+                  <div className="flex"><strong className="w-44">Reconciliation Number:</strong> <span>{statementNo || "—"}</span></div>
+                  <div className="flex"><strong className="w-44">Statement Date:</strong> <span>{statementDate ? format(new Date(statementDate + "T00:00:00"), "MM/dd/yy") : "—"}</span></div>
+                  <div className="flex"><strong className="w-44">Statement Number:</strong> <span>{statementNo || "—"}</span></div>
+               </div>
             </div>
-            <h2 className="text-base font-semibold text-muted-foreground">
-              Bank Reconciliation Statement
-            </h2>
-            <div className="mt-3 flex flex-wrap justify-center gap-x-8 gap-y-1 text-sm text-muted-foreground">
-              <span><strong>Account:</strong> {bankAccount.account_name} — {bankAccount.account_number}</span>
-              <span><strong>Statement Date:</strong> {statementDate ? format(new Date(statementDate + "T00:00:00"), "dd MMM yyyy") : "—"}</span>
-              {statementNo && <span><strong>Statement No:</strong> {statementNo}</span>}
-              <span><strong>Report Date:</strong> {format(new Date(), "dd MMM yyyy, HH:mm")}</span>
+            <div className="text-right">
+               <h2 className="font-bold text-base">{selectedCompany?.name || "Company"}</h2>
+               <div className="text-xs text-muted-foreground mt-4 space-y-1">
+                 <div className="flex justify-end gap-2"><strong className="w-12 text-left">Date:</strong> <span className="w-24 text-right">{format(new Date(), "MM/dd/yy")}</span></div>
+                 <div className="flex justify-end gap-2"><strong className="w-12 text-left">Time:</strong> <span className="w-24 text-right">{format(new Date(), "h:mm:ss a")}</span></div>
+               </div>
             </div>
           </div>
 
-          {/* --- Section A: Balance Per Bank Statement --- */}
-          <div className="recon-report-section">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50">
-                  <th className="text-left px-3 py-2 font-semibold" colSpan={2}>
-                    Section A — Balance Per Bank Statement
-                  </th>
-                  <th className="text-right px-3 py-2 font-semibold w-36">Amount (LKR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="px-3 py-2" colSpan={2}>Ending Balance as per Bank Statement</td>
-                  <td className="text-right px-3 py-2 font-semibold">{fmt(statementBalance)}</td>
-                </tr>
-              </tbody>
-            </table>
+          {/* --- Reconciliation Summary Header --- */}
+          <div className="recon-report-section border border-blue-200 rounded-sm overflow-hidden">
+            <div className="bg-blue-50/80 px-4 py-2 border-b border-blue-200 font-bold text-blue-900 text-[15px]">
+              Reconciliation Summary
+            </div>
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-12 text-[13px]">
+              {/* Bank Statement */}
+              <div>
+                <h3 className="font-bold mb-3 text-sm">Bank Statement</h3>
+                <div className="flex justify-between py-0.5">
+                  <span>Beginning Balance</span>
+                  <span>LKR {fmt(statementOpeningBalance)}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span>Cleared Cheques and Payments</span>
+                  <span>LKR {summary.clearedPaymentTotal > 0 ? `(${fmt(summary.clearedPaymentTotal)})` : "0.00"}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span>Cleared Deposits and Credits</span>
+                  <span>LKR {fmt(summary.clearedDepositTotal)}</span>
+                </div>
+                <div className="flex justify-between py-0.5 font-bold mt-2">
+                  <span>Ending Balance</span>
+                  <span>LKR {fmt(statementBalance)}</span>
+                </div>
+              </div>
+
+              {/* G/L Account */}
+              <div>
+                <h3 className="font-bold mb-3 text-sm">G/L Account</h3>
+                <div className="flex justify-between py-0.5">
+                  <span>Account Balance</span>
+                  <span>LKR {fmt(summary.bookBalance)}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span>Uncleared Cheques and Payments</span>
+                  <span>LKR {fmt(totalOutstandingChecks)}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span>Uncleared Deposits and Credits</span>
+                  <span>LKR {totalDepositsInTransit > 0 ? `(${fmt(totalDepositsInTransit)})` : "0.00"}</span>
+                </div>
+                <div className="flex justify-between py-0.5 font-bold mt-2">
+                  <span>Adjusted Account Balance</span>
+                  <span>LKR {fmt(adjustedBookBalance)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-blue-200 px-5 py-3 flex gap-[300px] font-bold text-sm bg-white">
+               <span className="w-44">Variance</span>
+               <span>LKR {fmt(Math.abs(difference))}</span>
+            </div>
           </div>
 
-          {/* --- Section B: Deposits in Transit --- */}
-          <div className="recon-report-section">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-blue-50 dark:bg-blue-950/30">
-                  <th className="text-left px-3 py-2 font-semibold">Section B — Add: Deposits in Transit</th>
-                  <th className="text-left px-3 py-2 font-medium w-28">Date</th>
-                  <th className="text-left px-3 py-2 font-medium w-32">Reference</th>
-                  <th className="text-right px-3 py-2 font-semibold w-36">Amount (LKR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unclearedDeposits.length === 0 ? (
-                  <tr className="border-b">
-                    <td className="px-3 py-2 text-muted-foreground italic" colSpan={4}>No deposits in transit</td>
-                  </tr>
-                ) : (
-                  unclearedDeposits.map((t) => (
-                    <tr key={t.id} className="border-b hover:bg-muted/20">
-                      <td className="px-3 py-1.5 text-xs">{t.description || "—"}</td>
-                      <td className="px-3 py-1.5 text-xs">{format(new Date(t.transaction_date), "dd/MM/yyyy")}</td>
-                      <td className="px-3 py-1.5 text-xs">{t.reference || "—"}</td>
-                      <td className="text-right px-3 py-1.5">{fmt(t.debit_amount || 0)}</td>
-                    </tr>
-                  ))
-                )}
-                <tr className="bg-blue-50/50 dark:bg-blue-950/20 font-semibold">
-                  <td className="px-3 py-2" colSpan={3}>Total Deposits in Transit</td>
-                  <td className="text-right px-3 py-2">{fmt(totalDepositsInTransit)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* --- Section C: Outstanding Checks --- */}
-          <div className="recon-report-section">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-orange-50 dark:bg-orange-950/30">
-                  <th className="text-left px-3 py-2 font-semibold">Section C — Less: Outstanding Checks/Payments</th>
-                  <th className="text-left px-3 py-2 font-medium w-28">Date</th>
-                  <th className="text-left px-3 py-2 font-medium w-32">Reference</th>
-                  <th className="text-right px-3 py-2 font-semibold w-36">Amount (LKR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unclearedPayments.length === 0 ? (
-                  <tr className="border-b">
-                    <td className="px-3 py-2 text-muted-foreground italic" colSpan={4}>No outstanding checks</td>
-                  </tr>
-                ) : (
-                  unclearedPayments.map((t) => (
-                    <tr key={t.id} className="border-b hover:bg-muted/20">
-                      <td className="px-3 py-1.5 text-xs">{t.description || "—"}</td>
-                      <td className="px-3 py-1.5 text-xs">{format(new Date(t.transaction_date), "dd/MM/yyyy")}</td>
-                      <td className="px-3 py-1.5 text-xs">{t.reference || "—"}</td>
-                      <td className="text-right px-3 py-1.5">({fmt(t.credit_amount || 0)})</td>
-                    </tr>
-                  ))
-                )}
-                <tr className="bg-orange-50/50 dark:bg-orange-950/20 font-semibold">
-                  <td className="px-3 py-2" colSpan={3}>Total Outstanding Checks</td>
-                  <td className="text-right px-3 py-2">({fmt(totalOutstandingChecks)})</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* --- Section D: Adjusted Bank Balance --- */}
-          <div className="recon-report-section">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-primary/10">
-                  <th className="text-left px-3 py-2 font-bold" colSpan={2}>
-                    Section D — Adjusted Bank Balance
-                  </th>
-                  <th className="text-right px-3 py-2 font-bold w-36">Amount (LKR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="px-3 py-1.5" colSpan={2}>Balance per Bank Statement</td>
-                  <td className="text-right px-3 py-1.5">{fmt(statementBalance)}</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="px-3 py-1.5" colSpan={2}>Add: Deposits in Transit</td>
-                  <td className="text-right px-3 py-1.5">{fmt(totalDepositsInTransit)}</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="px-3 py-1.5" colSpan={2}>Less: Outstanding Checks</td>
-                  <td className="text-right px-3 py-1.5">({fmt(totalOutstandingChecks)})</td>
-                </tr>
-                <tr className="bg-primary/5 font-bold border-t-2 border-primary/30">
-                  <td className="px-3 py-2" colSpan={2}>Adjusted Bank Balance</td>
-                  <td className="text-right px-3 py-2 text-base">{fmt(adjustedBankBalance)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* --- Divider --- */}
-          <div className="border-t-2 border-dashed border-muted-foreground/30" />
-
-          {/* --- Section E: Balance Per Books --- */}
-          <div className="recon-report-section">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50">
-                  <th className="text-left px-3 py-2 font-semibold" colSpan={2}>
-                    Section E — Balance Per Books (General Ledger)
-                  </th>
-                  <th className="text-right px-3 py-2 font-semibold w-36">Amount (LKR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="px-3 py-2" colSpan={2}>Book Balance (Last Stmt Balance + Total Activity)</td>
-                  <td className="text-right px-3 py-2 font-semibold">{fmt(summary.bookBalance)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* --- Section F: Adjustments --- */}
-          {adjustments.length > 0 && (
-            <div className="recon-report-section">
-              <table className="w-full text-sm">
+          {/* --- Cleared Cheques and Payments Table --- */}
+          {clearedPayments.length > 0 && (
+            <div className="recon-report-section border border-blue-100 rounded-sm overflow-hidden">
+              <div className="bg-blue-50/50 px-4 py-2 border-b border-blue-100 font-bold text-blue-900 text-sm">
+                Cleared Cheques and Payments
+              </div>
+              <table className="w-full text-[11px]">
                 <thead>
-                  <tr className="bg-amber-50 dark:bg-amber-950/30">
-                    <th className="text-left px-3 py-2 font-semibold">Section F — Adjustments to Book Balance</th>
-                    <th className="text-left px-3 py-2 font-medium w-32">Type</th>
-                    <th className="text-right px-3 py-2 font-semibold w-36">Amount (LKR)</th>
+                  <tr className="border-b bg-muted/20 text-muted-foreground">
+                    <th className="text-left px-4 py-2 font-medium w-12">Type</th>
+                    <th className="text-left px-4 py-2 font-medium w-20">Trans. No.</th>
+                    <th className="text-left px-4 py-2 font-medium w-20">Date</th>
+                    <th className="text-left px-4 py-2 font-medium">Payee / Description</th>
+                    <th className="text-left px-4 py-2 font-medium w-28">Ref / Chq No.</th>
+                    <th className="text-right px-4 py-2 font-medium w-28">Debit</th>
+                    <th className="text-right px-4 py-2 font-medium w-28">Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clearedPayments.map((t) => (
+                    <tr key={t.id} className="border-b border-muted/50 last:border-0 hover:bg-muted/10">
+                      <td className="px-4 py-1.5 text-muted-foreground">
+                        {t.source_type?.includes('ap_payment') ? 'PS' : t.source_type?.includes('ar_receipt') ? 'RC' : t.source_type?.includes('statement') ? 'ST' : 'JV'}
+                      </td>
+                      <td className="px-4 py-1.5 font-mono text-[10px] uppercase text-muted-foreground">{t.id?.split('-')[0]}</td>
+                      <td className="px-4 py-1.5">{format(new Date(t.transaction_date), "MM/dd/yy")}</td>
+                      <td className="px-4 py-1.5 font-medium">{t.description || "—"}</td>
+                      <td className="px-4 py-1.5">{t.reference || t.cheque_number || "—"}</td>
+                      <td className="text-right px-4 py-1.5 text-muted-foreground">—</td>
+                      <td className="text-right px-4 py-1.5">LKR {fmt(t.credit_amount || 0)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-muted/5 font-bold border-t border-muted">
+                    <td className="px-4 py-2 text-right" colSpan={6}>Total Cleared Payments</td>
+                    <td className="text-right px-4 py-2">LKR {fmt(summary.clearedPaymentTotal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* --- Cleared Deposits and Credits Table --- */}
+          {clearedDeposits.length > 0 && (
+            <div className="recon-report-section border border-blue-100 rounded-sm overflow-hidden">
+              <div className="bg-blue-50/50 px-4 py-2 border-b border-blue-100 font-bold text-blue-900 text-sm">
+                Cleared Deposits and Credits
+              </div>
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b bg-muted/20 text-muted-foreground">
+                    <th className="text-left px-4 py-2 font-medium w-12">Type</th>
+                    <th className="text-left px-4 py-2 font-medium w-20">Trans. No.</th>
+                    <th className="text-left px-4 py-2 font-medium w-20">Date</th>
+                    <th className="text-left px-4 py-2 font-medium">Description</th>
+                    <th className="text-left px-4 py-2 font-medium w-28">Ref / Chq No.</th>
+                    <th className="text-right px-4 py-2 font-medium w-28">Debit</th>
+                    <th className="text-right px-4 py-2 font-medium w-28">Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clearedDeposits.map((t) => (
+                    <tr key={t.id} className="border-b border-muted/50 last:border-0 hover:bg-muted/10">
+                      <td className="px-4 py-1.5 text-muted-foreground">
+                        {t.source_type?.includes('ap_payment') ? 'PS' : t.source_type?.includes('ar_receipt') ? 'RC' : t.source_type?.includes('statement') ? 'ST' : 'JV'}
+                      </td>
+                      <td className="px-4 py-1.5 font-mono text-[10px] uppercase text-muted-foreground">{t.id?.split('-')[0]}</td>
+                      <td className="px-4 py-1.5">{format(new Date(t.transaction_date), "MM/dd/yy")}</td>
+                      <td className="px-4 py-1.5 font-medium">{t.description || "—"}</td>
+                      <td className="px-4 py-1.5">{t.reference || t.cheque_number || "—"}</td>
+                      <td className="text-right px-4 py-1.5">LKR {fmt(t.debit_amount || 0)}</td>
+                      <td className="text-right px-4 py-1.5 text-muted-foreground">—</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-muted/5 font-bold border-t border-muted">
+                    <td className="px-4 py-2 text-right" colSpan={5}>Total Cleared Deposits</td>
+                    <td className="text-right px-4 py-2">LKR {fmt(summary.clearedDepositTotal)}</td>
+                    <td className="text-right px-4 py-2 text-muted-foreground">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* --- Adjustments Table --- */}
+          {adjustments.length > 0 && (
+            <div className="recon-report-section border border-amber-100 rounded-sm overflow-hidden">
+              <div className="bg-amber-50/50 px-4 py-2 border-b border-amber-100 font-bold text-amber-900 text-sm">
+                Adjustments to Book Balance
+              </div>
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b bg-muted/20 text-muted-foreground">
+                    <th className="text-left px-4 py-2 font-medium">Description</th>
+                    <th className="text-left px-4 py-2 font-medium w-40">Type</th>
+                    <th className="text-right px-4 py-2 font-medium w-32">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {adjustments.map((adj, i) => (
-                    <tr key={i} className="border-b hover:bg-muted/20">
-                      <td className="px-3 py-1.5">{adj.description}</td>
-                      <td className="px-3 py-1.5">
-                        <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${
-                          adj.type === "interest_earned"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                            : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                        }`}>
-                          {adjTypeLabel(adj.type)}
-                        </span>
-                      </td>
-                      <td className="text-right px-3 py-1.5">
-                        {adj.type === "interest_earned" ? fmt(adj.amount) : `(${fmt(adj.amount)})`}
+                    <tr key={i} className="border-b border-muted/50 last:border-0 hover:bg-muted/10">
+                      <td className="px-4 py-1.5">{adj.description || "—"}</td>
+                      <td className="px-4 py-1.5">{adjTypeLabel(adj.type)}</td>
+                      <td className="text-right px-4 py-1.5">
+                        {adj.type === "interest_earned" ? `LKR ${fmt(adj.amount)}` : `LKR (${fmt(adj.amount)})`}
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-amber-50/50 dark:bg-amber-950/20 font-semibold">
-                    <td className="px-3 py-2" colSpan={2}>Net Adjustment</td>
-                    <td className="text-right px-3 py-2">
-                      {fmt(summary.adjDepositTotal - summary.adjPaymentTotal)}
-                    </td>
-                  </tr>
                 </tbody>
               </table>
             </div>
           )}
-
-          {/* --- Section G: Adjusted Book Balance --- */}
-          <div className="recon-report-section">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-primary/10">
-                  <th className="text-left px-3 py-2 font-bold" colSpan={2}>
-                    Section G — Adjusted Book Balance
-                  </th>
-                  <th className="text-right px-3 py-2 font-bold w-36">Amount (LKR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="px-3 py-1.5" colSpan={2}>Book Balance</td>
-                  <td className="text-right px-3 py-1.5">{fmt(summary.bookBalance)}</td>
-                </tr>
-                {adjustments.length > 0 && (
-                  <>
-                    {summary.adjDepositTotal > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-1.5" colSpan={2}>Add: Interest / Credits</td>
-                        <td className="text-right px-3 py-1.5">{fmt(summary.adjDepositTotal)}</td>
-                      </tr>
-                    )}
-                    {summary.adjPaymentTotal > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-1.5" colSpan={2}>Less: Bank Charges / Fees</td>
-                        <td className="text-right px-3 py-1.5">({fmt(summary.adjPaymentTotal)})</td>
-                      </tr>
-                    )}
-                  </>
-                )}
-                <tr className="bg-primary/5 font-bold border-t-2 border-primary/30">
-                  <td className="px-3 py-2" colSpan={2}>Adjusted Book Balance</td>
-                  <td className="text-right px-3 py-2 text-base">{fmt(adjustedBookBalance)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* --- Reconciliation Status --- */}
-          <div className={`recon-report-section rounded-lg border-2 p-4 ${
-            isReconciled
-              ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30"
-              : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30"
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {isReconciled ? (
-                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-                ) : (
-                  <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-                )}
-                <div>
-                  <p className="font-bold text-sm">
-                    {isReconciled ? "✓ Reconciliation Balanced" : "⚠ Unreconciled Difference"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {isReconciled
-                      ? "The adjusted bank balance matches the adjusted book balance."
-                      : "There is a difference between the adjusted balances that needs to be resolved."}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Difference</p>
-                <p className={`text-lg font-bold ${isReconciled ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`}>
-                  LKR {fmt(summary.difference)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* --- Matched Items Summary --- */}
-          {clearedTransactions.length > 0 && (
-            <div className="recon-report-section">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="text-left px-3 py-2 font-semibold">Cleared/Matched Transactions ({clearedTransactions.length})</th>
-                    <th className="text-left px-3 py-2 font-medium w-28">Date</th>
-                    <th className="text-left px-3 py-2 font-medium w-32">Reference</th>
-                    <th className="text-right px-3 py-2 font-medium w-28">Debit</th>
-                    <th className="text-right px-3 py-2 font-medium w-28">Credit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clearedTransactions.map((t) => (
-                    <tr key={t.id} className="border-b hover:bg-muted/20">
-                      <td className="px-3 py-1 text-xs">{t.description || "—"}</td>
-                      <td className="px-3 py-1 text-xs">{format(new Date(t.transaction_date), "dd/MM/yyyy")}</td>
-                      <td className="px-3 py-1 text-xs">{t.reference || "—"}</td>
-                      <td className="text-right px-3 py-1 text-xs">{(t.debit_amount || 0) > 0 ? fmt(t.debit_amount) : "—"}</td>
-                      <td className="text-right px-3 py-1 text-xs">{(t.credit_amount || 0) > 0 ? fmt(t.credit_amount) : "—"}</td>
-                    </tr>
-                  ))}
-                  <tr className="bg-muted/30 font-semibold">
-                    <td className="px-3 py-2" colSpan={3}>Total Cleared</td>
-                    <td className="text-right px-3 py-2">{fmt(summary.clearedDepositTotal)}</td>
-                    <td className="text-right px-3 py-2">{fmt(summary.clearedPaymentTotal)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* --- Footer --- */}
-          <div className="border-t pt-4 flex justify-between text-xs text-muted-foreground">
-            <div>
-              <p>Prepared on: {format(new Date(), "dd MMM yyyy, HH:mm:ss")}</p>
-              <p>Bank Account: {bankAccount.account_name} ({bankAccount.account_number})</p>
-            </div>
-            <div className="text-right">
-              <p>{selectedCompany?.name || "Company"}</p>
-              <p>Bank Reconciliation Statement</p>
-            </div>
-          </div>
 
         </div>
       </DialogContent>

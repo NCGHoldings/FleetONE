@@ -8,10 +8,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { usePettyCashTransactions, useCreatePettyCashReimbursement } from "@/hooks/usePettyCash";
+import { Badge } from "@/components/ui/badge";
+import { usePettyCashTransactions, useCreatePettyCashReimbursement, useSyncPettyCashGL } from "@/hooks/usePettyCash";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
+import { RefreshCw } from "lucide-react";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBankAccounts } from "@/hooks/useAccountingData";
@@ -29,6 +31,7 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange, onSuccessPrin
   const { data: transactions, isLoading } = usePettyCashTransactions(fundId);
   const { data: bankAccounts } = useBankAccounts();
   const reimburseMutation = useCreatePettyCashReimbursement();
+  const syncMutation = useSyncPettyCashGL();
 
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<string[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
@@ -145,17 +148,18 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange, onSuccessPrin
                       <TableHead>Voucher #</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Description</TableHead>
+                      <TableHead>JE Status</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">Loading...</TableCell>
+                        <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">Loading...</TableCell>
                       </TableRow>
                     ) : eligibleVouchers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No eligible vouchers found.</TableCell>
+                        <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">No eligible vouchers found.</TableCell>
                       </TableRow>
                     ) : (
                       eligibleVouchers.map((voucher: any) => (
@@ -170,6 +174,25 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange, onSuccessPrin
                           <TableCell>{format(new Date(voucher.created_at), "MMM dd, yyyy")}</TableCell>
                           <TableCell className="max-w-[200px] truncate" title={voucher.description || ""}>
                             {voucher.description}
+                          </TableCell>
+                          <TableCell>
+                            {!voucher.journal_entry_id ? (
+                              <div className="flex items-center gap-2">
+                                <Badge variant="destructive" className="text-[10px] h-4">Missing</Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => syncMutation.mutate(voucher.id)}
+                                  disabled={syncMutation.isPending}
+                                  title="Sync to GL"
+                                >
+                                  <RefreshCw className={`h-3 w-3 text-orange-500 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] h-4 bg-emerald-500 text-white border-transparent">Synced</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-medium">
                             <span className={voucher.transaction_type === "replenishment" ? "text-green-600" : ""}>

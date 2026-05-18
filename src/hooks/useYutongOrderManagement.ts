@@ -200,6 +200,16 @@ export const useYutongOrderManagement = () => {
             customer_phone,
             customer_email,
             company_name
+          ),
+          yutong_invoice_records (
+            id,
+            invoice_no,
+            invoice_category,
+            status
+          ),
+          ar_invoices (
+            journal_entry_id,
+            tax_amount
           )
         `)
         .order('created_at', { ascending: false });

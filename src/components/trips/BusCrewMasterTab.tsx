@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Bus, Users, User, Phone, Search, ChevronDown, ChevronUp, Loader2, CreditCard, UserCheck, Briefcase, Calendar, Pencil, Save, Check, X, MapPin, UserCog } from 'lucide-react';
+import { Bus, Users, User, Phone, Search, ChevronDown, ChevronUp, Loader2, CreditCard, UserCheck, Briefcase, Calendar, Pencil, Save, Check, X, MapPin, UserCog, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { CrewCollectionSummaryReport } from './CrewCollectionSummaryReport';
 
-interface CrewMember {
+export interface CrewMember {
   id: string;
   staff_name: string;
   calling_name: string;
@@ -49,6 +50,7 @@ export const BusCrewMasterTab = () => {
   const [editBusValue, setEditBusValue] = useState('');
   const [isEditingBus, setIsEditingBus] = useState(false);
   const [savingBus, setSavingBus] = useState(false);
+  const [showSummaryReport, setShowSummaryReport] = useState(false);
   const { toast } = useToast();
 
   const formatBusNo = (val: string) => {
@@ -266,6 +268,15 @@ export const BusCrewMasterTab = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-bold hidden sm:flex"
+              onClick={() => setShowSummaryReport(true)}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              View Summary Report
+            </Button>
             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
               {totalVisibleProfiles} Profiles
             </Badge>
@@ -640,6 +651,14 @@ export const BusCrewMasterTab = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {showSummaryReport && (
+        <CrewCollectionSummaryReport 
+          crew={crew} 
+          busRouteMap={busRouteMap} 
+          onClose={() => setShowSummaryReport(false)} 
+        />
+      )}
     </>
   );
 };

@@ -59,28 +59,47 @@ export function MasterExpenseUploader({ onSuccess }: Props) {
         let amount = 0;
         let expense_date = format(new Date(), "yyyy-MM-dd");
 
+        const parseAmount = (val: any) => {
+          if (!val) return 0;
+          if (typeof val === 'number') return val;
+          const str = String(val).replace(/,/g, '');
+          const match = str.match(/-?\d+(?:\.\d+)?/);
+          return match ? parseFloat(match[0]) : 0;
+        };
+
+        const parseRobustDate = (val: any) => {
+          if (!val) return null;
+          if (typeof val === 'number') {
+            return new Date(Math.round((val - 25569) * 86400 * 1000));
+          }
+          const str = String(val).trim().split(" ")[0]; // Get date part only
+          // Try DD/MM/YYYY
+          const dmyMatch = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+          if (dmyMatch) {
+            const day = parseInt(dmyMatch[1], 10);
+            const month = parseInt(dmyMatch[2], 10) - 1;
+            let year = parseInt(dmyMatch[3], 10);
+            if (year < 100) year += 2000;
+            return new Date(year, month, day);
+          }
+          const d = new Date(str);
+          return isNaN(d.getTime()) ? null : d;
+        };
+
         if (expenseType === "PickMe") {
-           amount = Number(row["TOTAL FARE"]) || 0;
+           amount = parseAmount(row["TOTAL FARE"]);
            if (row["PICKUP TIME"]) {
               try {
-                if (typeof row["PICKUP TIME"] === "number") {
-                   const date = new Date(Math.round((row["PICKUP TIME"] - 25569) * 86400 * 1000));
-                   expense_date = format(date, "yyyy-MM-dd");
-                } else {
-                   expense_date = format(new Date(row["PICKUP TIME"]), "yyyy-MM-dd");
-                }
+                const date = parseRobustDate(row["PICKUP TIME"]);
+                if (date) expense_date = format(date, "yyyy-MM-dd");
               } catch (err) { }
            }
         } else if (expenseType === "Fuel") {
-           amount = Number(row["TRNX_Rs_Value"]) || 0;
+           amount = parseAmount(row["TRNX_Rs_Value"]);
            if (row["TRNX_Time"]) {
               try {
-                if (typeof row["TRNX_Time"] === "number") {
-                   const date = new Date(Math.round((row["TRNX_Time"] - 25569) * 86400 * 1000));
-                   expense_date = format(date, "yyyy-MM-dd");
-                } else {
-                   expense_date = format(new Date(row["TRNX_Time"].toString().split(" ")[0]), "yyyy-MM-dd");
-                }
+                const date = parseRobustDate(row["TRNX_Time"]);
+                if (date) expense_date = format(date, "yyyy-MM-dd");
               } catch (err) { }
            }
         }

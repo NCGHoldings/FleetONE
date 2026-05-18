@@ -1197,8 +1197,8 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       
       console.log(`✅ Page ${i + 1} canvas rendered. Size:`, canvas.width, 'x', canvas.height);
 
-      // Use PNG for crisp text and table borders (no JPEG compression artifacts)
-      const imgData = canvas.toDataURL('image/png');
+      // Use high-quality JPEG to significantly reduce file size while maintaining readability
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
       
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
@@ -1213,7 +1213,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
         pdf.addPage();
       }
       
-      pdf.addImage(imgData, 'PNG', imgX, imgY, scaledWidth, scaledHeight);
+      pdf.addImage(imgData, 'JPEG', imgX, imgY, scaledWidth, scaledHeight);
       console.log(`📊 Page ${i + 1} added to PDF`);
     }
     

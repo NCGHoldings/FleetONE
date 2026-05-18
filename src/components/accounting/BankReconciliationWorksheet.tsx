@@ -104,6 +104,7 @@ const BankReconciliationWorksheet = () => {
   const [statementNo, setStatementNo] = useState("");
   const [statementDate, setStatementDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [statementBalance, setStatementBalance] = useState<string>("");
+  const [openingBalanceInput, setOpeningBalanceInput] = useState<string>("");
   const [displayFilter, setDisplayFilter] = useState<DisplayFilter>("not_cleared");
   const [clearedState, setClearedState] = useState<ClearedState>({});
   const [showAdjustments, setShowAdjustments] = useState(false);
@@ -234,6 +235,7 @@ const BankReconciliationWorksheet = () => {
   );
 
   const lastStatementBalance = lastRecon?.statement_balance ?? selectedAccount?.opening_balance ?? 0;
+  const statementOpeningBalance = openingBalanceInput !== "" ? parseFloat(openingBalanceInput) : lastStatementBalance;
   const targetBalance = parseFloat(statementBalance) || 0;
 
   // Build a set of "fully paired" IDs — both statement+book sides cleared
@@ -409,8 +411,8 @@ const BankReconciliationWorksheet = () => {
       else adjPaymentTotal += adj.amount;
     });
 
-    const bookBalance = lastStatementBalance + depositTotal - paymentTotal;
-    const clearedBookBalance = lastStatementBalance + clearedDepositTotal - clearedPaymentTotal + adjDepositTotal - adjPaymentTotal;
+    const bookBalance = statementOpeningBalance + depositTotal - paymentTotal;
+    const clearedBookBalance = statementOpeningBalance + clearedDepositTotal - clearedPaymentTotal + adjDepositTotal - adjPaymentTotal;
     const stmtEndBal = targetBalance;
     const difference = clearedBookBalance - stmtEndBal;
 
@@ -424,7 +426,7 @@ const BankReconciliationWorksheet = () => {
       stmtEndBal,
       difference,
     };
-  }, [bookTxns, clearedState, lastStatementBalance, targetBalance, adjustments]);
+  }, [bookTxns, clearedState, statementOpeningBalance, targetBalance, adjustments]);
 
   // --- Gap Detection: find unmatched items on each side ---
   const gapAnalysis = useMemo(() => {
@@ -1037,8 +1039,20 @@ const BankReconciliationWorksheet = () => {
           </div>
 
           <div className="bank-recon-header-field border-l pl-4 border-muted">
+            <label>Opening Balance</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={openingBalanceInput}
+              onChange={(e) => setOpeningBalanceInput(e.target.value)}
+              placeholder={`${fmt(lastStatementBalance)}`}
+              className="w-[120px]"
+            />
+          </div>
+
+          <div className="bank-recon-header-field border-l pl-4 border-muted">
             <label>Last Reconciled Bal.</label>
-            <span className="value">LKR {fmt(lastStatementBalance)}</span>
+            <span className="value text-xs text-muted-foreground pt-2">LKR {fmt(lastStatementBalance)}</span>
           </div>
 
           <div className="ml-auto flex items-center gap-2 pr-4 pt-1">
@@ -1243,9 +1257,48 @@ const BankReconciliationWorksheet = () => {
                 </div>
                 <div className="flex-1 flex justify-between items-center px-4 py-2">
                    <span className="flex items-center gap-2 font-semibold text-sm"><BookOpen className="w-4 h-4 text-emerald-600" /> System Records (Book)</span>
-                   <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                      <div className="flex items-center gap-1 bg-muted/30 rounded-md p-1 border mr-2">
+                        <span className="text-[10px] text-muted-foreground px-1 uppercase tracking-wider font-bold">Month</span>
+                        <Input
+                          type="month"
+                          onChange={(e) => {
+                             const val = e.target.value;
+                             if (!val) {
+                               setFromDate(''); setToDate('');
+                               return;
+                             }
+                             const [y, m] = val.split('-');
+                             const start = new Date(parseInt(y), parseInt(m) - 1, 1);
+                             const end = new Date(parseInt(y), parseInt(m), 0);
+                             setFromDate(format(start, 'yyyy-MM-dd'));
+                             setToDate(format(end, 'yyyy-MM-dd'));
+                          }}
+                          className="h-6 text-xs w-[110px] bg-transparent border-0 focus-visible:ring-0 shadow-none p-0 cursor-pointer"
+                        />
+                      </div>
+                      <Input
+                         type="date"
+                         value={fromDate}
+                         onChange={(e) => setFromDate(e.target.value)}
+                         className="h-6 text-xs w-[110px]"
+                         placeholder="From Date"
+                      />
+                      <span className="text-muted-foreground text-xs">to</span>
+                      <Input
+                         type="date"
+                         value={toDate}
+                         onChange={(e) => setToDate(e.target.value)}
+                         className="h-6 text-xs w-[110px]"
+                         placeholder="To Date"
+                      />
+                      {(fromDate || toDate) && (
+                        <Button variant="ghost" size="sm" className="h-6 px-1 text-muted-foreground hover:text-red-600" onClick={() => { setFromDate(''); setToDate(''); }} title="Clear Dates">
+                          <X className="w-3 h-3" />
+                        </Button>
+                      )}
                       <Select value={displayFilter} onValueChange={(v) => setDisplayFilter(v as DisplayFilter)}>
-                        <SelectTrigger className="h-6 text-xs w-[120px] bg-muted/50 border-0">
+                        <SelectTrigger className="h-6 text-xs w-[140px] bg-muted/50 border-0">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1510,6 +1563,28 @@ const BankReconciliationWorksheet = () => {
                 )}
               </span>
             </div>
+
+            {summary.difference !== 0 && (
+              <div className="text-xs text-muted-foreground mt-2 p-3 bg-red-50/50 dark:bg-red-900/10 rounded border border-red-100 dark:border-red-900">
+                <div className="font-semibold mb-2 text-red-800 dark:text-red-400 flex items-center gap-1">
+                  <BookOpen className="w-3 h-3" /> Difference Breakdown Guidance:
+                </div>
+                <div className="flex justify-between py-0.5"><span>Starting / Opening Balance:</span> <span className="font-mono">{fmt(statementOpeningBalance)}</span></div>
+                <div className="flex justify-between py-0.5 text-green-700 dark:text-green-400"><span>+ Cleared Deposits:</span> <span className="font-mono">{fmt(summary.clearedDepositTotal)}</span></div>
+                <div className="flex justify-between py-0.5 text-red-700 dark:text-red-400"><span>- Cleared Payments:</span> <span className="font-mono">{fmt(summary.clearedPaymentTotal)}</span></div>
+                {summary.adjDepositTotal > 0 && <div className="flex justify-between py-0.5 text-green-700 dark:text-green-400"><span>+ Adjustments (In):</span> <span className="font-mono">{fmt(summary.adjDepositTotal)}</span></div>}
+                {summary.adjPaymentTotal > 0 && <div className="flex justify-between py-0.5 text-red-700 dark:text-red-400"><span>- Adjustments (Out):</span> <span className="font-mono">{fmt(summary.adjPaymentTotal)}</span></div>}
+                <div className="flex justify-between font-semibold border-t border-red-200 dark:border-red-800 mt-1 pt-1">
+                  <span>= Calculated Book Balance:</span> <span className="font-mono">{fmt(summary.clearedBookBalance)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-foreground mt-1">
+                  <span>Target Statement Balance:</span> <span className="font-mono">{fmt(summary.stmtEndBal)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-red-600 dark:text-red-500 border-t border-red-200 dark:border-red-800 mt-1 pt-1">
+                  <span>Unexplained Difference:</span> <span className="font-mono">{fmt(summary.difference)}</span>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 mt-3 pt-2">
                <Button variant="outline" size="sm" onClick={handleCancel}>Cancel</Button>
@@ -1801,7 +1876,7 @@ const BankReconciliationWorksheet = () => {
         statementDate={statementDate}
         statementNo={statementNo}
         statementBalance={parseFloat(statementBalance) || 0}
-        lastStatementBalance={lastStatementBalance}
+        statementOpeningBalance={statementOpeningBalance}
         clearedState={clearedState}
         transactions={transactions}
         adjustments={adjustments}

@@ -14,7 +14,7 @@ import { YutongCreateOrderModal } from './YutongCreateOrderModal';
 import { YutongOrderCard } from './YutongOrderCard';
 import { YutongShipmentGroupManagement } from './YutongShipmentGroupManagement';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2 } from 'lucide-react';
+import { Trash2, CheckCircle2, MinusCircle } from 'lucide-react';
 
 const phaseLabels = {
   'order_confirmation': 'Order Confirmation',
@@ -49,6 +49,7 @@ export function YutongOrdersList() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<YutongOrder | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [activeOrderTab, setActiveOrderTab] = useState('overview');
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [showShipments, setShowShipments] = useState(false);
@@ -205,6 +206,39 @@ export function YutongOrdersList() {
       },
     },
     {
+      header: "VAT & Journal",
+      cell: ({ row }) => {
+        const arInvoice = (row.original as any).ar_invoices;
+        const jeId = arInvoice?.journal_entry_id;
+        const taxAmount = arInvoice?.tax_amount;
+        
+        return (
+          <div className="space-y-1 text-sm min-w-[120px]">
+            {taxAmount > 0 ? (
+              <div className="flex items-center text-green-600 font-medium">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                LKR {taxAmount.toLocaleString()}
+              </div>
+            ) : (
+              <div className="flex items-center text-muted-foreground text-xs">
+                <MinusCircle className="h-3 w-3 mr-1" />
+                No VAT
+              </div>
+            )}
+            {jeId ? (
+              <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200">
+                JE Linked
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] text-orange-500 border-orange-200">
+                No JE
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "current_phase",
       header: "Current Phase",
       cell: ({ row }) => getPhaseBadge(row.getValue("current_phase")),
@@ -242,23 +276,45 @@ export function YutongOrdersList() {
               size="sm"
               onClick={() => {
                 setSelectedOrder(order);
+                setActiveOrderTab('overview');
                 setShowOrderDetails(true);
               }}
               title="View Details"
             >
               <Eye className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                setSelectedOrder(order);
-                setShowOrderDetails(true);
-              }}
-              title="Invoice Management"
-            >
-              <FileText className="h-4 w-4" />
-            </Button>
+            
+            {(order as any).yutong_invoice_records && (order as any).yutong_invoice_records.length > 0 ? (
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+                onClick={() => {
+                  setSelectedOrder(order);
+                  setActiveOrderTab('invoices');
+                  setShowOrderDetails(true);
+                }}
+                title="View Invoice"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                {(order as any).yutong_invoice_records[0].invoice_no}
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-dashed"
+                onClick={() => {
+                  setSelectedOrder(order);
+                  setActiveOrderTab('invoices');
+                  setShowOrderDetails(true);
+                }}
+                title="Create Invoice"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create Inv
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="sm"
@@ -377,6 +433,7 @@ export function YutongOrdersList() {
             setSelectedOrder(null);
           }}
           onRefresh={loadOrders}
+          defaultTab={activeOrderTab}
         />
       )}
 

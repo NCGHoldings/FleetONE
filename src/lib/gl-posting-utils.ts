@@ -868,9 +868,9 @@ export async function fixBalanceDiscrepancies(
  * Reverses COA balance changes and deletes a journal entry + its lines.
  * Used by force-delete mutations during testing mode.
  */
-export async function reverseAndDeleteJournalEntry(journalEntryId: string): Promise<{ success: boolean; error?: string }> {
+export async function reverseAndDeleteJournalEntry(journalEntryId: string, forceDeletePosted = false): Promise<{ success: boolean; error?: string }> {
   try {
-    // HIGH-05: Guard — never physically delete a posted journal entry.
+    // HIGH-05: Guard — never physically delete a posted journal entry unless forced.
     // Posted JEs must be reversed via a contra entry, not deleted.
     const { data: je, error: jeErr } = await supabase
       .from("journal_entries")
@@ -881,7 +881,7 @@ export async function reverseAndDeleteJournalEntry(journalEntryId: string): Prom
     if (jeErr) throw jeErr;
     if (!je) return { success: false, error: "Journal entry not found." };
 
-    if (je.status === "posted") {
+    if (je.status === "posted" && !forceDeletePosted) {
       return {
         success: false,
         error: "Cannot delete a posted journal entry. Use the Reverse action to create a contra entry instead.",

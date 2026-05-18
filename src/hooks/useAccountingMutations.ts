@@ -1147,6 +1147,7 @@ export const useCreateARReceipt = () => {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       toast.success("Receipt recorded successfully");
     },
@@ -1800,6 +1801,7 @@ export const useCreateAPPayment = () => {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       toast.success("Payment recorded successfully");
     },
@@ -2098,6 +2100,7 @@ export const useMergeInvoiceToAPPayment = () => {
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Invoice successfully merged into Payment");
     },
@@ -2469,6 +2472,7 @@ export const useConsolidateAPPayments = () => {
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Payments consolidated successfully");
     },
@@ -4105,6 +4109,7 @@ export const useCreateFundTransfer = () => {
       queryClient.invalidateQueries({ queryKey: ["fund-transfers", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Fund transfer completed & posted to GL");
@@ -4755,6 +4760,7 @@ export const useImportBankStatement = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["bank-statement-imports", selectedCompanyId] });
       toast.success("Bank statement imported successfully");
     },
@@ -5301,7 +5307,7 @@ export const useDeleteAPInvoice = () => {
       // 3. Reverse and delete JE if exists
       if (invoice?.journal_entry_id) {
         const { reverseAndDeleteJournalEntry } = await import("@/lib/gl-posting-utils");
-        await reverseAndDeleteJournalEntry(invoice.journal_entry_id);
+        await reverseAndDeleteJournalEntry(invoice.journal_entry_id, true);
       }
 
       // 4. Delete invoice lines then invoice
@@ -5375,7 +5381,7 @@ export const useDeleteAPPayment = () => {
       await (supabase as any).from("cheque_register").delete().eq("payment_id", id);
 
       // 3. Delete linked bank transactions
-      await supabase.from("bank_transactions").delete().eq("reference", `AP-PAY-${id}`);
+      await supabase.from("bank_transactions").delete().eq("source_id", id);
 
       // 4. Reverse bank account balance (add amount back)
       if (payment.bank_account_id) {
@@ -5394,7 +5400,7 @@ export const useDeleteAPPayment = () => {
       // 5. Reverse and delete JE
       if (payment.journal_entry_id) {
         const { reverseAndDeleteJournalEntry } = await import("@/lib/gl-posting-utils");
-        await reverseAndDeleteJournalEntry(payment.journal_entry_id);
+        await reverseAndDeleteJournalEntry(payment.journal_entry_id, true);
       }
 
       // 6. Delete payment lines (direct payments)
@@ -5410,6 +5416,7 @@ export const useDeleteAPPayment = () => {
       queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
       toast.success("AP Payment deleted with JE & bank reversal");
@@ -5471,7 +5478,7 @@ export const useDeleteARReceipt = () => {
       await (supabase as any).from("cheque_register").delete().eq("ar_receipt_id", id);
 
       // 3. Delete linked bank transactions
-      await supabase.from("bank_transactions").delete().eq("reference", `AR-REC-${id}`);
+      await supabase.from("bank_transactions").delete().eq("source_id", id);
 
       // 4. Reverse bank account balance (subtract amount back)
       if (receipt.bank_account_id) {
@@ -5503,6 +5510,7 @@ export const useDeleteARReceipt = () => {
       queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
       toast.success("AR Receipt deleted with JE & bank reversal");

@@ -116,7 +116,7 @@ export default function MasterExpenses() {
                    setSelectedImport(imp);
                  }} />
                ) : selectedImport ? (
-                 <ExpenseMappingGrid importData={selectedImport} />
+                 <ExpenseMappingGrid importData={selectedImport} onDelete={() => setSelectedImport(null)} />
                ) : (
                  <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-12">
                    <div className="h-24 w-24 bg-primary/5 rounded-full flex items-center justify-center mb-4">

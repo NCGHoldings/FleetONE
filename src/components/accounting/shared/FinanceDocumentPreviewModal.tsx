@@ -368,8 +368,8 @@ export const FinanceDocumentPreviewModal = ({
       return result + ' only.';
     })();
 
-    // Manager's bank (destination bank from beneficiary)
-    const managerBankName = vba?.bank_name || doc?.vendors?.bank_name || 'the Bank';
+    // The letter is addressed to the Company's Bank
+    const addresseeBankName = companyBankName || 'the Bank';
 
     return `
       <!DOCTYPE html>
@@ -395,7 +395,7 @@ export const FinanceDocumentPreviewModal = ({
         <div class="date">${paymentDate}</div>
         <div class="address">
           The Manager,<br/>
-          ${managerBankName} PLC
+          ${addresseeBankName} PLC
         </div>
         <div class="salutation">Dear Sir/Madam,</div>
         <div class="subject">

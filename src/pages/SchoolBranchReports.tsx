@@ -100,15 +100,18 @@ export default function SchoolBranchReports() {
       // Fetch all data in parallel using robust GL and Transaction tables
       const [transactionsRes, expensesRes, staffRes, busesRes, importsRes] = await Promise.all([
         supabase
-          .from("school_payment_transactions")
+          .from("school_ar_invoices")
           .select(`
-            amount_paid, 
-            payment_date,
-            school_students!inner(bus_reg_no, route, branch_id)
+            amount, 
+            invoice_month,
+            school_students!inner(bus_reg_no, route, branch_id),
+            ar_invoices!inner(id)
           `)
           .eq("school_students.branch_id", branchId!)
-          .gte("payment_date", periodStart.toISOString())
-          .lte("payment_date", periodEnd.toISOString()),
+          .gte("invoice_month", fromStr)
+          .lte("invoice_month", toStr)
+          .in("status", ["posted", "paid", "partial"])
+          .limit(10000),
         supabase
           .from("journal_entry_lines")
           .select(`
@@ -124,9 +127,9 @@ export default function SchoolBranchReports() {
           .eq("chart_of_accounts.account_type", "expense")
           .not("bus_id", "is", null),
         supabase
-          .from("route_staff_costs")
-          .select("route_id, staff_type, monthly_salary, bus_id")
-          .eq("branch_id", branchId!)
+          .from("staff_registry")
+          .select("staff_type, monthly_salary, assigned_bus")
+          .not("assigned_bus", "is", null)
           .eq("is_active", true),
         supabase
           .from("buses")
@@ -176,13 +179,13 @@ export default function SchoolBranchReports() {
       const financials: BusFinancial[] = routes.map(route => {
         const normRouteBus = normalizeReg(route.bus_reg_no);
         
-        // 1. Income from actual posted transactions
-        const routeTx = transactions.filter(tx => {
-           const student = Array.isArray(tx.school_students) ? tx.school_students[0] : tx.school_students;
+        // 1. Income from accrued AR Invoices
+        const routeInvoices = transactions.filter(inv => {
+           const student = Array.isArray(inv.school_students) ? inv.school_students[0] : inv.school_students;
            if (!student) return false;
            return student.route === route.route_name || normalizeReg(student.bus_reg_no) === normRouteBus;
         });
-        const income = routeTx.reduce((sum, tx) => sum + (Number(tx.amount_paid) || 0), 0);
+        const income = routeInvoices.reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
 
         // 2. Expenses from actual General Ledger entries tied to the bus
         const routeExpenses = expenses.filter(e => {
@@ -205,9 +208,9 @@ export default function SchoolBranchReports() {
         });
 
         // 3. Staff costs (recurring configs)
-        const routeStaff = staff.filter(s => s.route_id === route.id || (normRouteBus && normalizeReg(getBusNo(s.bus_id)) === normRouteBus));
-        const driverSalary = routeStaff.filter(s => s.staff_type === "driver").reduce((s, st) => s + Number(st.monthly_salary), 0);
-        const caretakerSalary = routeStaff.filter(s => s.staff_type === "caretaker").reduce((s, st) => s + Number(st.monthly_salary), 0);
+        const routeStaff = staff.filter(s => normRouteBus && s.assigned_bus && normalizeReg(s.assigned_bus) === normRouteBus);
+        const driverSalary = routeStaff.filter(s => s.staff_type === "driver").reduce((s, st) => s + Number(st.monthly_salary || 0), 0);
+        const caretakerSalary = routeStaff.filter(s => s.staff_type === "caretaker" || s.staff_type === "conductor").reduce((s, st) => s + Number(st.monthly_salary || 0), 0);
 
         const totalDirectExpenses = fuel + maintenance + driverSalary + caretakerSalary + parking + other;
         const directProfit = income - totalDirectExpenses;

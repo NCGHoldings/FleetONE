@@ -41,7 +41,7 @@ export function usePagePermissions(targetUserId?: string) {
     try {
       // 5-second timeout to prevent infinite "Verifying access..." loading state
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Permissions fetch timeout - Network might be unreachable")), 30000);
+        setTimeout(() => reject(new Error("Permissions fetch timeout - Network might be unreachable")), 5000);
       });
 
       const fetchPromise = supabase

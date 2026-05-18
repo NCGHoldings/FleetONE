@@ -35,6 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 import { RelatedJournalEntries } from "./shared/RelatedJournalEntries";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const AccountsReceivableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
@@ -47,6 +48,7 @@ export const AccountsReceivableView = () => {
   const [printDocumentData, setPrintDocumentData] = useState<any>(null);
   const [printDocumentType, setPrintDocumentType] = useState<string>("ar_invoice");
   const [searchQuery, setSearchQuery] = useState("");
+  const [vatFilter, setVatFilter] = useState<"all" | "has_vat" | "no_vat">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const { data: invoices, isLoading } = useARInvoices(statusFilter);
@@ -256,21 +258,34 @@ export const AccountsReceivableView = () => {
 
   // Multi-field search filter
   const filteredInvoices = useMemo(() => {
-    if (!invoices || !searchQuery.trim()) return invoices || [];
-    const query = searchQuery.toLowerCase();
-    return invoices.filter((inv) =>
-      inv.invoice_number?.toLowerCase().includes(query) ||
-      inv.customers?.customer_name?.toLowerCase().includes(query) ||
-      inv.customers?.customer_code?.toLowerCase().includes(query) ||
-      inv.status?.toLowerCase().includes(query) ||
-      inv.reference?.toLowerCase().includes(query) ||
-      inv.bus_no?.toLowerCase().includes(query) ||
-      inv.school_ar_invoices?.[0]?.school_students?.bus_reg_no?.toLowerCase().includes(query) ||
-      inv.school_ar_invoices?.[0]?.school_students?.route?.toLowerCase().includes(query) ||
-      inv.school_ar_invoices?.[0]?.school_students?.school_location?.toLowerCase().includes(query) ||
-      inv.bus_categories?.name?.toLowerCase().includes(query)
-    );
-  }, [invoices, searchQuery]);
+    if (!invoices) return [];
+    
+    let result = invoices;
+    
+    if (vatFilter === "has_vat") {
+      result = result.filter((inv: any) => (inv.tax_amount || 0) > 0);
+    } else if (vatFilter === "no_vat") {
+      result = result.filter((inv: any) => !(inv.tax_amount > 0));
+    }
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((inv) =>
+        inv.invoice_number?.toLowerCase().includes(query) ||
+        inv.customers?.customer_name?.toLowerCase().includes(query) ||
+        inv.customers?.customer_code?.toLowerCase().includes(query) ||
+        inv.status?.toLowerCase().includes(query) ||
+        inv.reference?.toLowerCase().includes(query) ||
+        inv.bus_no?.toLowerCase().includes(query) ||
+        inv.school_ar_invoices?.[0]?.school_students?.bus_reg_no?.toLowerCase().includes(query) ||
+        inv.school_ar_invoices?.[0]?.school_students?.route?.toLowerCase().includes(query) ||
+        inv.school_ar_invoices?.[0]?.school_students?.school_location?.toLowerCase().includes(query) ||
+        inv.bus_categories?.name?.toLowerCase().includes(query)
+      );
+    }
+    
+    return result;
+  }, [invoices, searchQuery, vatFilter]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -406,6 +421,20 @@ export const AccountsReceivableView = () => {
       cell: ({ row }: any) => <CurrencyDisplay amount={row.original.total_amount || 0} />,
     },
     {
+      accessorKey: "tax_amount",
+      header: "VAT Allocation",
+      cell: ({ row }: any) => {
+        const vat = row.original.tax_amount || 0;
+        return vat > 0 ? (
+          <span className="text-blue-600 font-medium text-xs">
+            <CurrencyDisplay amount={vat} />
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-[10px] font-medium bg-muted px-2 py-0.5 rounded-md border">NO VAT</span>
+        );
+      },
+    },
+    {
       accessorKey: "paid_amount",
       header: "Paid",
       cell: ({ row }: any) => (
@@ -499,10 +528,15 @@ export const AccountsReceivableView = () => {
     ?.filter((inv: any) => isOverdue(inv.due_date, inv.status || ""))
     .reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0) || 0;
 
+  // VAT allocation KPIs
+  const vatAllocatedTotal = filteredInvoices?.reduce((sum: number, inv: any) => sum + (inv.tax_amount || 0), 0) || 0;
+  const vatInvoiceCount = filteredInvoices?.filter((inv: any) => (inv.tax_amount || 0) > 0).length || 0;
+  const noVatInvoiceCount = filteredInvoices?.filter((inv: any) => !(inv.tax_amount > 0)).length || 0;
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Total Invoices</p>
           <h3 className="text-2xl font-bold mt-1">{filteredInvoices?.length || 0}</h3>
@@ -522,12 +556,38 @@ export const AccountsReceivableView = () => {
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Overdue Invoices</p>
           <h3 className="text-2xl font-bold text-destructive mt-1">{overdueCount}</h3>
+          <p className="text-xs text-destructive/70 mt-0.5"><CurrencyDisplay amount={overdueAmount} /></p>
+        </Card>
+      </div>
+
+      {/* VAT Allocation Cards */}
+      <div className="grid gap-4 grid-cols-3">
+        <Card className="p-4 bg-blue-50/50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-900">
+          <p className="text-sm text-blue-700 dark:text-blue-400 font-medium">Total VAT Allocated</p>
+          <h3 className="text-2xl font-bold text-blue-700 dark:text-blue-300 mt-1">
+            <CurrencyDisplay amount={vatAllocatedTotal} />
+          </h3>
+          <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5">From {vatInvoiceCount} invoice{vatInvoiceCount !== 1 ? 's' : ''}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Overdue Amount</p>
-          <h3 className="text-2xl font-bold text-destructive mt-1">
-            <CurrencyDisplay amount={overdueAmount} />
+          <p className="text-sm text-muted-foreground">Invoices with VAT</p>
+          <h3 className="text-2xl font-bold text-blue-600 mt-1">{vatInvoiceCount}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {filteredInvoices?.length ? Math.round((vatInvoiceCount / filteredInvoices.length) * 100) : 0}% of total
+          </p>
+        </Card>
+        <Card className={`p-4 ${noVatInvoiceCount > 0 ? 'bg-amber-50/50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800' : 'bg-green-50/50 border-green-100'}`}>
+          <p className={`text-sm font-medium ${noVatInvoiceCount > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-green-700'}`}>
+            {noVatInvoiceCount > 0 ? 'Missing VAT' : 'VAT Complete'}
+          </p>
+          <h3 className={`text-2xl font-bold mt-1 ${noVatInvoiceCount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-green-700'}`}>
+            {noVatInvoiceCount}
           </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {noVatInvoiceCount > 0
+              ? <span className="cursor-pointer underline" onClick={() => setVatFilter("no_vat")}>View missing →</span>
+              : 'All invoices have VAT ✓'}
+          </p>
         </Card>
       </div>
 
@@ -570,15 +630,28 @@ export const AccountsReceivableView = () => {
           </div>
         </div>
 
-        {/* Search Input */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by invoice #, customer, bus no., category, status..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 max-w-md"
-          />
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by invoice #, customer, bus no., category, status..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <Select value={vatFilter} onValueChange={(v: any) => setVatFilter(v)}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by VAT" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Invoices</SelectItem>
+              <SelectItem value="has_vat">Has VAT Allocation</SelectItem>
+              <SelectItem value="no_vat">Missing VAT Allocation</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <Tabs defaultValue="all" className="space-y-4">

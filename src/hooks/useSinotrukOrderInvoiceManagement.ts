@@ -153,7 +153,7 @@ export function useSinotrukOrderInvoiceManagement() {
         });
       
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Storage upload timeout after 30 seconds')), 30000)
+        setTimeout(() => reject(new Error('Storage upload timeout after 120 seconds')), 120000)
       );
       
       const uploadResult = await Promise.race([uploadPromise, timeoutPromise]) as any;
@@ -422,7 +422,9 @@ export function useSinotrukOrderInvoiceManagement() {
         // Check if AR Invoice already exists
         let arInvoiceId = orderDetails?.ar_invoice_id;
         
-        const isTax = invoiceData.invoice_category === 'tax_invoice' || 
+        const invoiceCategory = invoice.invoice_category || invoiceData.invoice_category || 'direct_invoice';
+        const isTax = invoiceCategory === 'tax_invoice' || 
+                      invoiceCategory === 'direct_invoice' || 
                       invoiceData.is_tax_invoice || 
                       (invoiceData.tax_rate && invoiceData.tax_rate > 0) || 
                       (invoiceData.vat_amount && invoiceData.vat_amount > 0);

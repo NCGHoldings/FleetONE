@@ -33,6 +33,7 @@ interface EnhancedYutongOrderDetailsModalProps {
   open: boolean;
   onClose: () => void;
   onRefresh: () => void;
+  defaultTab?: string;
 }
 
 const processTabsConfig = [
@@ -49,9 +50,10 @@ export function EnhancedYutongOrderDetailsModal({
   order, 
   open, 
   onClose, 
-  onRefresh 
+  onRefresh,
+  defaultTab = 'overview'
 }: EnhancedYutongOrderDetailsModalProps) {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [showPOPreview, setShowPOPreview] = useState(false);
 
   if (!order) return null;

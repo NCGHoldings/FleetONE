@@ -1,5 +1,5 @@
  
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/utils";
@@ -101,6 +101,9 @@ export const DrillDownModal = ({
   const [isSavingOpeningBalance, setIsSavingOpeningBalance] = useState(false);
   const [isTogglingLock, setIsTogglingLock] = useState(false);
 
+  // Column text filters
+  const [colFilters, setColFilters] = useState<Record<string, string>>({});
+
   const [previewDocType, setPreviewDocType] = useState<string>("");
   const [previewDocData, setPreviewDocData] = useState<any>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -111,6 +114,10 @@ export const DrillDownModal = ({
   const [lineageAmount, setLineageAmount] = useState<number>(0);
   const [lineageType, setLineageType] = useState<"debit" | "credit">("debit");
   const [isLineageOpen, setIsLineageOpen] = useState(false);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const ROWS_PER_PAGE = 100;
 
   const defaultColumns = ["date", "entry_number", "account", "bu", "bus", "route", "reference", "party_name", "description", "debit", "credit", "balance", "status"];
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
@@ -270,9 +277,20 @@ export const DrillDownModal = ({
 
   // Fetch invoice balances for auto-reconciliation display
   const { data: invoiceBalances } = useQuery({
-    queryKey: ["drilldown-invoice-balances", transactions?.map(t => (t.journal_entries as any)?.reference).join(',')],
+    queryKey: ["drilldown-invoice-balances", resolvedAccountIds, dateRange, businessUnitFilter, busFilter, routeFilter, transactions?.length],
     queryFn: async () => {
       if (!transactions || transactions.length === 0) return {};
+      
+      const fetchInChunks = async (table: string, column: string, values: string[], select: string) => {
+        const CHUNK_SIZE = 80;
+        let allData: any[] = [];
+        for (let i = 0; i < values.length; i += CHUNK_SIZE) {
+          const chunk = values.slice(i, i + CHUNK_SIZE);
+          const { data } = await supabase.from(table).select(select).in(column, chunk);
+          if (data) allData = allData.concat(data);
+        }
+        return allData;
+      };
       
       const arInvoiceRefs = new Set<string>();
       const apInvoiceRefs = new Set<string>();
@@ -330,49 +348,49 @@ export const DrillDownModal = ({
       // Fetch AR Invoices — include customer name
       if (arInvoiceRefs.size > 0) {
         const refsArray = Array.from(arInvoiceRefs);
-        // Primary: exact match on invoice_number
-        const { data } = await supabase.from('ar_invoices').select('invoice_number, balance, customers(customer_name)').in('invoice_number', refsArray);
+        // Primary: exact match on invoice_number in chunks
+        const data = await fetchInChunks('ar_invoices', 'invoice_number', refsArray, 'invoice_number, balance, customers(customer_name)');
         data?.forEach((inv: any) => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice', partyName: inv.customers?.customer_name || '' }; });
         
         // Secondary: for unmatched refs that look like actual invoice numbers,
         // do a scoped ILIKE lookup (e.g. short-form YT-CI-260101 vs full NCGH-YT-CI-260101)
         const matchedRefs = new Set(data?.map((inv: any) => inv.invoice_number) || []);
         const unmatchedRefs = refsArray.filter(r => !matchedRefs.has(r));
-        // Only attempt fuzzy matching for refs that look like actual invoice references
-        // (contain -CI- or -INV-). Skip generic refs to prevent cross-customer contamination.
         const fuzzyEligibleRefs = unmatchedRefs.filter(r => 
           r.includes('-CI-') || r.includes('-INV-') || r.startsWith('NCGH-')
         );
         if (fuzzyEligibleRefs.length > 0) {
-          // Build OR filter for ILIKE matching
-          const orFilter = fuzzyEligibleRefs.map(r => `invoice_number.ilike.%${r}%`).join(',');
-          const { data: fuzzyData } = await supabase.from('ar_invoices').select('invoice_number, balance, customers(customer_name)').or(orFilter);
-          fuzzyData?.forEach((inv: any) => {
-            // Map the result back to the original short ref that matched
-            // Check BOTH directions for substring containment
-            const originalRef = fuzzyEligibleRefs.find(r => 
-              inv.invoice_number.includes(r) || r.includes(inv.invoice_number)
-            );
-            if (originalRef && !balances[originalRef]) {
-              balances[originalRef] = { balance: inv.balance, type: 'invoice', partyName: inv.customers?.customer_name || '' };
-            }
-          });
+          const CHUNK_SIZE = 30; // smaller chunk for OR filters
+          for (let i = 0; i < fuzzyEligibleRefs.length; i += CHUNK_SIZE) {
+            const chunk = fuzzyEligibleRefs.slice(i, i + CHUNK_SIZE);
+            const orFilter = chunk.map(r => `invoice_number.ilike.%${r}%`).join(',');
+            const { data: fuzzyData } = await supabase.from('ar_invoices').select('invoice_number, balance, customers(customer_name)').or(orFilter);
+            fuzzyData?.forEach((inv: any) => {
+              // Map the result back to the original short ref that matched
+              const originalRef = chunk.find(r => 
+                inv.invoice_number.includes(r) || r.includes(inv.invoice_number)
+              );
+              if (originalRef && !balances[originalRef]) {
+                balances[originalRef] = { balance: inv.balance, type: 'invoice', partyName: inv.customers?.customer_name || '' };
+              }
+            });
+          }
         }
       }
       
       // Fetch AP Invoices — include vendor name
       if (apInvoiceRefs.size > 0) {
-        const { data } = await supabase.from('ap_invoices').select('invoice_number, balance, vendors(vendor_name)').in('invoice_number', Array.from(apInvoiceRefs));
+        const data = await fetchInChunks('ap_invoices', 'invoice_number', Array.from(apInvoiceRefs), 'invoice_number, balance, vendors(vendor_name)');
         data?.forEach((inv: any) => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice', partyName: inv.vendors?.vendor_name || '' }; });
       }
       
       // Fetch AR Receipts — include customer name + parent invoice
       if (arReceiptRefs.size > 0) {
-        const { data: receipts } = await supabase.from('ar_receipts').select('id, receipt_number, customers(customer_name)').in('receipt_number', Array.from(arReceiptRefs));
+        const receipts = await fetchInChunks('ar_receipts', 'receipt_number', Array.from(arReceiptRefs), 'id, receipt_number, customers(customer_name)');
         if (receipts && receipts.length > 0) {
           const receiptMap = Object.fromEntries(receipts.map((r: any) => [r.id, { number: r.receipt_number, partyName: r.customers?.customer_name || '' }]));
-          const { data: allocations } = await supabase.from('ar_receipt_allocations').select('receipt_id, ar_invoices(invoice_number)').in('receipt_id', receipts.map(r => r.id));
-          allocations?.forEach(alloc => { 
+          const allocations = await fetchInChunks('ar_receipt_allocations', 'receipt_id', receipts.map((r: any) => r.id), 'receipt_id, ar_invoices(invoice_number)');
+          allocations?.forEach((alloc: any) => { 
             const info = receiptMap[alloc.receipt_id];
             if (info && alloc.ar_invoices?.invoice_number) {
               balances[info.number] = { balance: 0, type: 'receipt', parentRef: alloc.ar_invoices.invoice_number, partyName: info.partyName }; 
@@ -389,11 +407,11 @@ export const DrillDownModal = ({
       
       // Fetch AP Payments — include vendor name + parent invoice
       if (apPaymentRefs.size > 0) {
-        const { data: payments } = await supabase.from('ap_payments').select('id, payment_number, vendors(vendor_name)').in('payment_number', Array.from(apPaymentRefs));
+        const payments = await fetchInChunks('ap_payments', 'payment_number', Array.from(apPaymentRefs), 'id, payment_number, vendors(vendor_name)');
         if (payments && payments.length > 0) {
           const paymentMap = Object.fromEntries(payments.map((p: any) => [p.id, { number: p.payment_number, partyName: p.vendors?.vendor_name || '' }]));
-          const { data: allocations } = await supabase.from('ap_payment_allocations').select('payment_id, ap_invoices(invoice_number)').in('payment_id', payments.map(p => p.id));
-          allocations?.forEach(alloc => { 
+          const allocations = await fetchInChunks('ap_payment_allocations', 'payment_id', payments.map((p: any) => p.id), 'payment_id, ap_invoices(invoice_number)');
+          allocations?.forEach((alloc: any) => { 
             const info = paymentMap[alloc.payment_id];
             if (info && alloc.ap_invoices?.invoice_number) {
               balances[info.number] = { balance: 0, type: 'receipt', parentRef: alloc.ap_invoices.invoice_number, partyName: info.partyName }; 
@@ -728,8 +746,50 @@ export const DrillDownModal = ({
     },
     enabled: showBreakdown && open && resolvedAccountIds.length > 0,
   });
+  /**
+   * Resolves the Customer / Vendor name for a journal entry.
+   * Priority: 1) Looked-up party name from invoiceBalances (real DB join)
+   *           2) Regex extraction from JE description (fallback)
+   */
+  const resolvePartyName = (jeReference: string | null | undefined, jeDescription: string | null | undefined): string => {
+    // Priority 1: Real name from source document lookup
+    if (jeReference && invoiceBalances?.[jeReference]?.partyName) {
+      return invoiceBalances[jeReference].partyName;
+    }
+    // Priority 2: Regex extraction from description
+    return extractPartyNameFromDesc(jeDescription);
+  };
 
-  // Filter by transaction type and reconciliation status
+  const extractPartyNameFromDesc = (jeDescription: string | null | undefined): string => {
+    if (!jeDescription) return '';
+    // Pattern 1: "AR Invoice: REF - CustomerName" or "AP Invoice: REF - VendorName"
+    const dashMatch = jeDescription.match(/^(?:AR Invoice|AP Invoice|Advance Applied|Credit Note)[^-]*-\s*(.+)$/i);
+    if (dashMatch) return dashMatch[1].trim();
+    // Pattern 2: Vehicle finance descriptions
+    const vehicleDescMatch = jeDescription.match(/^(?:YUT|SNT|LTV|SBO)\s+(?:ADVANCE|BALANCE|FULL|INVOICE|ADV|BAL|REV)\b.*\s-\s(.+)$/i);
+    if (vehicleDescMatch) {
+      const parts = vehicleDescMatch[1].split(/\s-\s/);
+      return parts[parts.length - 1].trim();
+    }
+    // Pattern 3: Vehicle JE line descriptions
+    const vehicleLineFromMatch = jeDescription.match(/^(?:YUT|SNT|LTV|SBO)\s+.*\bfrom\s+(.+?)\s+-\s+/i);
+    if (vehicleLineFromMatch) return vehicleLineFromMatch[1].trim();
+    // Pattern 4: "... from Name"
+    const fromMatch = jeDescription.match(/\bfrom\s+(.+)$/i);
+    if (fromMatch) return fromMatch[1].trim();
+    // Pattern 5: "... to Name"
+    const toMatch = jeDescription.match(/\bto\s+(.+)$/i);
+    if (toMatch) return toMatch[1].trim();
+    // Pattern 6: "Sales Revenue — CustomerName"
+    const emDashMatch = jeDescription.match(/(?:revenue|sales)\s*[—–-]\s*(.+)$/i);
+    if (emDashMatch) return emDashMatch[1].trim();
+    // Pattern 7: "YUT Sales revenue: CustomerName"
+    const colonMatch = jeDescription.match(/(?:sales|revenue|payment|receipt)[^:]*:\s*(.+)$/i);
+    if (colonMatch) return colonMatch[1].trim();
+    return '';
+  };
+
+  // Filter by transaction type, reconciliation status, and column text
   const filteredTransactions = useMemo(() => {
     if (!transactions) return [];
     let filtered = transactions;
@@ -744,8 +804,36 @@ export const DrillDownModal = ({
     if (transactionType === "credit") {
       filtered = filtered.filter((t) => (t.credit || 0) > 0);
     }
+
+    // Apply column text filters
+    Object.entries(colFilters).forEach(([colId, filterValue]) => {
+      const val = filterValue.trim().toLowerCase();
+      if (!val) return;
+      
+      filtered = filtered.filter(t => {
+        const entry = t.journal_entries as any;
+        if (colId === "entry_number") return entry?.entry_number?.toLowerCase().includes(val);
+        if (colId === "reference") return entry?.reference?.toLowerCase().includes(val);
+        if (colId === "party_name") {
+           const name = resolvePartyName(entry?.reference, entry?.description)?.toLowerCase() || "";
+           return name.includes(val);
+        }
+        if (colId === "description") {
+           const desc1 = (t.description || "").toLowerCase();
+           const desc2 = (entry?.description || "").toLowerCase();
+           return desc1.includes(val) || desc2.includes(val);
+        }
+        if (colId === "account") {
+           const acctInfo = (t as any).chart_of_accounts;
+           const acctStr = acctInfo ? `${acctInfo.account_code} - ${acctInfo.account_name}`.toLowerCase() : "";
+           return acctStr.includes(val);
+        }
+        return true;
+      });
+    });
+
     return filtered;
-  }, [transactions, transactionType, showReconciled]);
+  }, [transactions, transactionType, showReconciled, colFilters, invoiceBalances]);
 
   // Calculate running balance
   const { totalDebit, totalCredit, netMovement } = useMemo(() => {
@@ -926,66 +1014,21 @@ export const DrillDownModal = ({
     setTransactionType("all");
     setBusFilter("_all");
     setRouteFilter("_all");
+    setPage(1);
   };
 
   const hasActiveFilters = businessUnitFilter !== "_all" || transactionType !== "all" ||
     busFilter !== "_all" || routeFilter !== "_all" || dateRange.from || dateRange.to;
 
-  /**
-   * Extracts Customer or Vendor name from journal entry description.
-   * Patterns: "AR Invoice: REF - CustomerName", "AP Invoice: REF - VendorName",
-   *           "AR Receipt: REF from CustomerName", "AP Payment: REF to VendorName",
-   *           "Advance Receipt: REF from CustomerName"
-   */
-  /**
-   * Resolves the Customer / Vendor name for a journal entry.
-   * Priority: 1) Looked-up party name from invoiceBalances (real DB join)
-   *           2) Regex extraction from JE description (fallback)
-   */
-  const resolvePartyName = (jeReference: string | null | undefined, jeDescription: string | null | undefined): string => {
-    // Priority 1: Real name from source document lookup
-    if (jeReference && invoiceBalances?.[jeReference]?.partyName) {
-      return invoiceBalances[jeReference].partyName;
-    }
-    // Priority 2: Regex extraction from description
-    return extractPartyNameFromDesc(jeDescription);
-  };
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [dateRange, businessUnitFilter, busFilter, routeFilter, transactionType, showReconciled, resolvedAccountIds, colFilters]);
 
-  const extractPartyNameFromDesc = (jeDescription: string | null | undefined): string => {
-    if (!jeDescription) return '';
-    // Pattern 1: "AR Invoice: REF - CustomerName" or "AP Invoice: REF - VendorName"
-    const dashMatch = jeDescription.match(/^(?:AR Invoice|AP Invoice|Advance Applied|Credit Note)[^-]*-\s*(.+)$/i);
-    if (dashMatch) return dashMatch[1].trim();
-    // Pattern 2: Vehicle finance descriptions — "BU TYPE (method) - OrderNo - CustomerName"
-    // e.g. "YUT ADVANCE (Cash) - ORD-123 - John Smith"
-    // e.g. "YUT BALANCE (Bank Transfer) - ORD-456 - E R T PERERA"
-    // e.g. "SNT INVOICE - NCGH-SNT-CI-260101 - Customer Ltd"
-    // The customer name is always the LAST segment after the last " - "
-    const vehicleDescMatch = jeDescription.match(/^(?:YUT|SNT|LTV|SBO)\s+(?:ADVANCE|BALANCE|FULL|INVOICE|ADV|BAL|REV)\b.*\s-\s(.+)$/i);
-    if (vehicleDescMatch) {
-      // Extract the last " - " segment (the customer name)
-      const parts = vehicleDescMatch[1].split(/\s-\s/);
-      return parts[parts.length - 1].trim();
-    }
-    // Pattern 3: Vehicle JE line descriptions — "BU Advance from CustomerName - OrderNo"
-    // e.g. "YUT Advance from John Smith - ORD-123"
-    // e.g. "YUT Balance payment from Customer Ltd - ORD-456"
-    const vehicleLineFromMatch = jeDescription.match(/^(?:YUT|SNT|LTV|SBO)\s+.*\bfrom\s+(.+?)\s+-\s+/i);
-    if (vehicleLineFromMatch) return vehicleLineFromMatch[1].trim();
-    // Pattern 4: "... from Name" (AR Receipt, Advance Receipt)
-    const fromMatch = jeDescription.match(/\bfrom\s+(.+)$/i);
-    if (fromMatch) return fromMatch[1].trim();
-    // Pattern 5: "... to Name" (AP Payment)
-    const toMatch = jeDescription.match(/\bto\s+(.+)$/i);
-    if (toMatch) return toMatch[1].trim();
-    // Pattern 6: "Sales Revenue — CustomerName" or "Revenue — CustomerName"
-    const emDashMatch = jeDescription.match(/(?:revenue|sales)\s*[—–-]\s*(.+)$/i);
-    if (emDashMatch) return emDashMatch[1].trim();
-    // Pattern 7: "YUT Sales revenue: CustomerName" (colon separator)
-    const colonMatch = jeDescription.match(/(?:sales|revenue|payment|receipt)[^:]*:\s*(.+)$/i);
-    if (colonMatch) return colonMatch[1].trim();
-    return '';
-  };
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (page - 1) * ROWS_PER_PAGE;
+    return transactionsWithBalance.slice(startIndex, startIndex + ROWS_PER_PAGE);
+  }, [transactionsWithBalance, page]);
 
   const exportToCSV = () => {
     const dataToExport = selectedRows.size > 0
@@ -1246,14 +1289,74 @@ export const DrillDownModal = ({
                     />
                   </TableHead>
                   {visibleColumns.includes("date") && <TableHead>Date</TableHead>}
-                  {visibleColumns.includes("entry_number") && <TableHead>Entry #</TableHead>}
-                  {resolvedAccountIds.length > 1 && visibleColumns.includes("account") && <TableHead>Account</TableHead>}
+                  {visibleColumns.includes("entry_number") && (
+                    <TableHead>
+                      <div className="flex flex-col gap-1 py-1">
+                        <span>Entry #</span>
+                        <Input
+                          placeholder="Filter..."
+                          value={colFilters.entry_number || ""}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, entry_number: e.target.value }))}
+                          className="h-6 text-xs w-[120px]"
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {resolvedAccountIds.length > 1 && visibleColumns.includes("account") && (
+                    <TableHead>
+                      <div className="flex flex-col gap-1 py-1">
+                        <span>Account</span>
+                        <Input
+                          placeholder="Filter..."
+                          value={colFilters.account || ""}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, account: e.target.value }))}
+                          className="h-6 text-xs w-[140px]"
+                        />
+                      </div>
+                    </TableHead>
+                  )}
                   {visibleColumns.includes("bu") && <TableHead>BU</TableHead>}
                   {visibleColumns.includes("bus") && <TableHead>Bus</TableHead>}
                   {visibleColumns.includes("route") && <TableHead>Route</TableHead>}
-                  {visibleColumns.includes("reference") && <TableHead>Reference</TableHead>}
-                  {visibleColumns.includes("party_name") && <TableHead>Customer / Vendor</TableHead>}
-                  {visibleColumns.includes("description") && <TableHead>Description</TableHead>}
+                  {visibleColumns.includes("reference") && (
+                    <TableHead>
+                      <div className="flex flex-col gap-1 py-1">
+                        <span>Reference</span>
+                        <Input
+                          placeholder="Filter..."
+                          value={colFilters.reference || ""}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, reference: e.target.value }))}
+                          className="h-6 text-xs w-[120px]"
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {visibleColumns.includes("party_name") && (
+                    <TableHead>
+                      <div className="flex flex-col gap-1 py-1">
+                        <span>Customer / Vendor</span>
+                        <Input
+                          placeholder="Filter..."
+                          value={colFilters.party_name || ""}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, party_name: e.target.value }))}
+                          className="h-6 text-xs min-w-[140px]"
+                        />
+                      </div>
+                    </TableHead>
+                  )}
+                  {visibleColumns.includes("description") && (
+                    <TableHead>
+                      <div className="flex flex-col gap-1 py-1">
+                        <span>Description</span>
+                        <Input
+                          placeholder="Filter..."
+                          value={colFilters.description || ""}
+                          onChange={(e) => setColFilters(prev => ({ ...prev, description: e.target.value }))}
+                          className="h-6 text-xs min-w-[180px]"
+                        />
+                      </div>
+                    </TableHead>
+                  )}
                   {visibleColumns.includes("debit") && <TableHead className="text-right">Debit</TableHead>}
                   {visibleColumns.includes("credit") && <TableHead className="text-right">Credit</TableHead>}
                   {visibleColumns.includes("balance") && <TableHead className="text-right">Balance</TableHead>}
@@ -1262,7 +1365,7 @@ export const DrillDownModal = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactionsWithBalance.map((t) => {
+                {paginatedTransactions.map((t) => {
                   const entry = t.journal_entries as any;
                   const busInfo = t.buses as any;
                   const routeInfo = t.routes as any;
@@ -1483,6 +1586,33 @@ export const DrillDownModal = ({
             </Table>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {!isLoading && transactionsWithBalance.length > 0 && (
+          <div className="flex items-center justify-between p-3 border-t bg-muted/20">
+            <div className="text-sm text-muted-foreground">
+              Showing {(page - 1) * ROWS_PER_PAGE + 1} to {Math.min(page * ROWS_PER_PAGE, transactionsWithBalance.length)} of {transactionsWithBalance.length} entries
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={page === 1} 
+                onClick={() => setPage(p => p - 1)}
+              >
+                Previous
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={page * ROWS_PER_PAGE >= transactionsWithBalance.length} 
+                onClick={() => setPage(p => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
 
         <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
           <div className="flex items-center gap-4">

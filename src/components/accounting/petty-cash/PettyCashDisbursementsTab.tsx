@@ -7,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDownCircle, Plus, Loader2, FileText } from "lucide-react";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowDownCircle, Plus, Loader2, FileText, Activity, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { 
-  usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction,
+  usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction, useSyncPettyCashGL,
   PettyCashFund
 } from "@/hooks/usePettyCash";
 import { useAllProfiles } from "@/hooks/useAccountingData";
@@ -19,6 +21,8 @@ import { useQuery } from "@tanstack/react-query";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "../shared/SearchableAccountSelector";
 import { FinanceDocumentPreviewModal } from "../shared/FinanceDocumentPreviewModal";
+import { TransactionLineageDialog } from "../shared/TransactionLineageDialog";
+import { PettyCashGLSyncDialog } from "./PettyCashGLSyncDialog";
 import { Printer, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,6 +32,8 @@ export const PettyCashDisbursementsTab = () => {
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [previewData, setPreviewData] = useState<any>(null);
+  const [lineageJeId, setLineageJeId] = useState<string | null>(null);
+  const [syncingTransactionId, setSyncingTransactionId] = useState<string | null>(null);
   const submitLock = useRef(false);
 
   const { data: funds } = usePettyCashFunds();
@@ -38,6 +44,7 @@ export const PettyCashDisbursementsTab = () => {
   });
   const { data: profiles } = useAllProfiles();
   const createTransaction = useCreatePettyCashTransaction();
+  const syncMutation = useSyncPettyCashGL();
 
   const getCreatorName = (userId: string | null) => {
     if (!userId) return "System";
@@ -167,6 +174,128 @@ export const PettyCashDisbursementsTab = () => {
     return Array.from(map.values());
   }, [transactions]);
 
+  const columns: ColumnDef<any>[] = useMemo(() => [
+    {
+      accessorKey: "voucher_number",
+      header: "Voucher #",
+      cell: ({ row }) => <span className="font-mono text-sm">{row.original.voucher_number || "-"}</span>,
+    },
+    {
+      accessorKey: "created_at",
+      header: "Date",
+      cell: ({ row }) => format(new Date(row.original.created_at), "MMM dd, yyyy"),
+    },
+    {
+      id: "company",
+      accessorFn: (row) => row.company?.short_code || row.company?.name || "-",
+      header: "Section",
+      cell: ({ row }) => {
+        const company = row.original.company;
+        return company ? <Badge variant="secondary" className="text-xs">{company.short_code || company.name}</Badge> : <span>-</span>;
+      },
+    },
+    {
+      id: "fund_name",
+      accessorFn: (row) => row.fund?.fund_name || "-",
+      header: "Fund",
+    },
+    {
+      accessorKey: "payee_name",
+      header: "Payee",
+      cell: ({ row }) => row.original.payee_name || "-",
+    },
+    {
+      id: "expense_category",
+      accessorFn: (row) => {
+        if (row.expense_category_display === "Multiple") return "Multiple";
+        return row.expense_category ? getCategoryLabel(row.expense_category) : "-";
+      },
+      header: "Category",
+      cell: ({ row }) => {
+        const txn = row.original;
+        if (txn.expense_category_display === "Multiple") {
+          return <Badge variant="outline">Multiple Categories</Badge>;
+        }
+        return (
+          <div className="flex flex-col gap-1">
+            <span>{txn.expense_category ? getCategoryLabel(txn.expense_category) : "-"}</span>
+            {txn.vehicle_no && <Badge variant="secondary" className="w-fit text-[10px] h-4 px-1">{txn.vehicle_no}</Badge>}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "amount",
+      header: "Amount",
+      cell: ({ row }) => (
+        <span className="font-semibold text-destructive">
+          <CurrencyDisplay amount={row.original.amount} />
+        </span>
+      ),
+    },
+    {
+      accessorKey: "payment_method",
+      header: "Method",
+      cell: ({ row }) => <Badge variant="outline">{row.original.payment_method || "cash"}</Badge>,
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-1 items-start">
+          <Badge variant={getStatusColor(row.original.status || "approved") as any}>
+            {row.original.status || "approved"}
+          </Badge>
+          {!row.original.journal_entry_id && row.original.status === "approved" && (
+            <Badge variant="destructive" className="text-[10px] px-1 h-4">JE Missing</Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "created_by",
+      accessorFn: (row) => getCreatorName(row.created_by),
+      header: "Created By",
+      cell: ({ row }) => <span className="text-xs text-muted-foreground">{getCreatorName(row.original.created_by)}</span>,
+    },
+    {
+      accessorKey: "reference_number",
+      header: "Reference",
+      cell: ({ row }) => <span className="text-sm">{row.original.reference_number || "-"}</span>,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <div className="flex justify-end gap-2 items-center">
+          {!row.original.journal_entry_id && row.original.status === "approved" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSyncingTransactionId(row.original.id)}
+              title="Sync to General Ledger"
+            >
+              <RefreshCw className="h-4 w-4 text-orange-500" />
+            </Button>
+          )}
+          {row.original.journal_entry_id && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setLineageJeId(row.original.journal_entry_id)}
+              title="View JE Breakdown & Finance Hub"
+            >
+              <Activity className="h-4 w-4 text-blue-500" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={() => setPreviewData(row.original)} title="Print Document">
+            <Printer className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ], [profiles, filteredCategories]);
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -198,80 +327,19 @@ export const PettyCashDisbursementsTab = () => {
       </div>
 
       {/* Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Voucher #</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Section</TableHead>
-              <TableHead>Fund</TableHead>
-              <TableHead>Payee</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead>Method</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created By</TableHead>
-              <TableHead>Reference</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={12} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
-              </TableRow>
-            ) : groupedTransactions?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">No vouchers found</TableCell>
-              </TableRow>
-            ) : (
-              groupedTransactions?.map((txn: any) => (
-                <TableRow key={txn.id}>
-                  <TableCell className="font-mono text-sm">{txn.voucher_number || "-"}</TableCell>
-                  <TableCell>{format(new Date(txn.created_at), "MMM dd, yyyy")}</TableCell>
-                  <TableCell>
-                    {txn.company ? (
-                      <Badge variant="secondary" className="text-xs">{txn.company.short_code || txn.company.name}</Badge>
-                    ) : "-"}
-                  </TableCell>
-                  <TableCell>{txn.fund?.fund_name || "-"}</TableCell>
-                  <TableCell>{txn.payee_name || "-"}</TableCell>
-                  <TableCell>
-                    {txn.expense_category_display === "Multiple" ? (
-                      <Badge variant="outline">Multiple Categories</Badge>
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        <span>{txn.expense_category ? getCategoryLabel(txn.expense_category) : "-"}</span>
-                        {txn.vehicle_no && <Badge variant="secondary" className="w-fit text-[10px] h-4 px-1">{txn.vehicle_no}</Badge>}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold text-destructive">
-                    <CurrencyDisplay amount={txn.amount} />
-                  </TableCell>
-                  <TableCell><Badge variant="outline">{txn.payment_method || "cash"}</Badge></TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusColor(txn.status || "approved") as any}>
-                      {txn.status || "approved"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs text-muted-foreground">
-                      {getCreatorName(txn.created_by)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm">{txn.reference_number || "-"}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => setPreviewData(txn)}>
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <Card className="p-4 border-none shadow-none">
+        {isLoading ? (
+          <div className="text-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={groupedTransactions || []}
+            searchKey="payee_name"
+            enableColumnFilters={true}
+          />
+        )}
       </Card>
 
       {/* Disbursement Form Dialog */}
@@ -464,7 +532,22 @@ export const PettyCashDisbursementsTab = () => {
         documentType="petty_cash_voucher"
         documentData={previewData}
       />
+
+      {/* Transaction Lineage / JE Breakdown Modal */}
+      {lineageJeId && (
+        <TransactionLineageDialog
+          open={!!lineageJeId}
+          onOpenChange={(open) => !open && setLineageJeId(null)}
+          journalEntryId={lineageJeId}
+        />
+      )}
+
+      {/* GL Sync Dialog */}
+      <PettyCashGLSyncDialog
+        transactionId={syncingTransactionId}
+        isOpen={!!syncingTransactionId}
+        onClose={() => setSyncingTransactionId(null)}
+      />
     </div>
   );
 };
-

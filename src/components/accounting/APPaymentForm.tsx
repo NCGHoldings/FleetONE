@@ -651,7 +651,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                   name="vendor_id" // using vendor_id just to satisfy FormField, but we control the value manually
                   render={() => (
                     <FormItem>
-                      <FormLabel>Filter by Sub-Vendor / Agent</FormLabel>
+                      <FormLabel>Filter by Actual Vendor</FormLabel>
                       <SearchableVendorSelector
                         value={selectedSubVendor}
                         onValueChange={setSelectedSubVendor}

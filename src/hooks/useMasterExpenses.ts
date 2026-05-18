@@ -193,11 +193,41 @@ export const useMasterExpenses = () => {
     }
   });
 
+  const deleteExpenseSheet = useMutation({
+    mutationFn: async (importId: string) => {
+      // Due to FK cascading, deleting the import should also delete associated records.
+      // If no cascading is set up, we should delete records first.
+      const { error: recordsError } = await (supabase as any)
+        .from("master_expense_records")
+        .delete()
+        .eq("import_id", importId);
+        
+      if (recordsError) throw recordsError;
+
+      const { error: importError } = await (supabase as any)
+        .from("master_expense_imports")
+        .delete()
+        .eq("id", importId);
+
+      if (importError) throw importError;
+      
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["master_expense_imports"] });
+      toast.success("Import deleted successfully");
+    },
+    onError: (error: any) => {
+      toast.error("Failed to delete import", { description: error.message });
+    }
+  });
+
   return {
     imports,
     isLoadingImports,
     getRecordsForImport,
     uploadExpenseSheet,
-    updateRecordMapping
+    updateRecordMapping,
+    deleteExpenseSheet
   };
 };

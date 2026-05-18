@@ -11,13 +11,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { 
   FileText, Plus, RefreshCw, User, Calendar, 
-  AlertTriangle, CheckCircle, Clock, Loader2, Printer, Trash2
+  AlertTriangle, CheckCircle, Clock, Loader2, Printer, Trash2, Activity
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { useIOURecords, useCreateIOU, useUpdateIOU, IOURecord, usePettyCashFunds } from "@/hooks/usePettyCash";
 import { BUSINESS_UNITS } from "@/hooks/useExpenseRequests";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { TransactionLineageDialog } from "./shared/TransactionLineageDialog";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useChartOfAccounts, useBankAccounts } from "@/hooks/useAccountingData";
@@ -40,6 +41,7 @@ export const IOUManagementView = () => {
   const [settleAmount, setSettleAmount] = useState(0);
   const [expenseAmount, setExpenseAmount] = useState(0);
   const [previewData, setPreviewData] = useState<any>(null);
+  const [lineageJeId, setLineageJeId] = useState<string | null>(null);
 
   // New IOU form state
   const [newStaffName, setNewStaffName] = useState("");
@@ -324,6 +326,16 @@ export const IOUManagementView = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {(iou as any).journal_entry_id && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => setLineageJeId((iou as any).journal_entry_id)}
+                            title="View JE Breakdown & Finance Hub"
+                          >
+                            <Activity className="h-4 w-4 text-blue-500" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -705,6 +717,15 @@ export const IOUManagementView = () => {
           if (!open) setIouToDelete(null);
         }}
       />
+
+      {/* Transaction Lineage / JE Breakdown Modal */}
+      {lineageJeId && (
+        <TransactionLineageDialog
+          open={!!lineageJeId}
+          onOpenChange={(open) => !open && setLineageJeId(null)}
+          journalEntryId={lineageJeId}
+        />
+      )}
     </div>
   );
 };

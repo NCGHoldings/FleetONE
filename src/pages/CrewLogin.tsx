@@ -27,13 +27,17 @@ const formatNIC = (val: string) => {
 const englishOnly = (val: string) => val.replace(/[^a-zA-Z0-9\s.\-]/g, '');
 
 const formatBusNumber = (val: string) => {
-  // Remove all spaces and dashes, then auto-insert dash before last 4 digits
-  let cleaned = val.replace(/[\s-]/g, '').toUpperCase();
-  const match = cleaned.match(/^([A-Z0-9]+?)(\d{4})$/);
-  if (match) {
-    cleaned = `${match[1]}-${match[2]}`;
+  // Remove non-alphanumeric chars
+  let cleaned = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  
+  // Extract up to 2 letters, then up to 4 digits
+  let letters = cleaned.replace(/[^A-Z]/g, '').slice(0, 2);
+  let numbers = cleaned.replace(/[^0-9]/g, '').slice(0, 4);
+  
+  if (numbers.length > 0) {
+     return `${letters}-${numbers}`;
   }
-  return cleaned;
+  return letters;
 };
 
 export default function CrewLogin() {
@@ -109,10 +113,21 @@ export default function CrewLogin() {
     setIsProcessing(true);
     const cleanRegNic = regNic.replace(/\s/g, '');
     
+    const finalAssignedBus = formatBusNumber(regAssignedBus);
+
+    // Strict validation: Must be exactly 2 letters, a hyphen, and exactly 4 numbers.
+    if (regEmploymentType !== 'temporary' || finalAssignedBus.length > 0) {
+      if (!/^[A-Z]{2}-\d{4}$/.test(finalAssignedBus)) {
+        toast({ title: "Invalid Bus Format", description: "Bus number must be exactly 2 English letters followed by a hyphen and exactly 4 numbers (e.g., ND-3456).", variant: "destructive" });
+        setIsProcessing(false);
+        return;
+      }
+    }
+
     // For permanent, default salary basis to monthly to satisfy the db constraints
     const finalSalaryType = regEmploymentType === 'permanent' ? 'monthly' : regSalaryType;
     
-    const result = await register(regFullName, regCallingName, cleanRegNic, regPhone, regRole, finalSalaryType, regEmploymentType, formatBusNumber(regAssignedBus));
+    const result = await register(regFullName, regCallingName, cleanRegNic, regPhone, regRole, finalSalaryType, regEmploymentType, finalAssignedBus);
     setIsProcessing(false);
 
     if (result.success) {

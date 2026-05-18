@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { ArrowUpCircle, Plus, Loader2, Info, Printer, MoreHorizontal, Landmark, FileSpreadsheet, RefreshCw, Undo2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { 
-  usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction 
+  usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction, useSyncPettyCashGL 
 } from "@/hooks/usePettyCash";
 import { useAllProfiles } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
@@ -21,6 +23,7 @@ import { PettyCashReimbursementDialog } from "./PettyCashReimbursementDialog";
 import { PettyCashTopUpDialog } from "./PettyCashTopUpDialog";
 import { FinanceDocumentPreviewModal } from "../shared/FinanceDocumentPreviewModal";
 import { JournalEntryDetailDialog } from "../JournalEntryDetailDialog";
+import { PettyCashGLSyncDialog } from "./PettyCashGLSyncDialog";
 import { VehicleFinanceSettlement } from "../shared/VehicleFinanceSettlement";
 import { VehicleModule } from "@/hooks/useVehicleSalesFinance";
 import { reverseJournalEntry } from "@/hooks/useEditAccountingMutations";
@@ -33,6 +36,7 @@ export const PettyCashReplenishmentsTab = () => {
   const [showTopUpForm, setShowTopUpForm] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
   const [jePreviewId, setJePreviewId] = useState<string | null>(null);
+  const [syncingTransactionId, setSyncingTransactionId] = useState<string | null>(null);
   const [isReversing, setIsReversing] = useState(false);
   const [financeHubState, setFinanceHubState] = useState<{isOpen: boolean; orderId: string; module: VehicleModule | null}>({
     isOpen: false,
@@ -51,23 +55,28 @@ export const PettyCashReplenishmentsTab = () => {
     let module: VehicleModule | null = null;
     const bu = txn.fund?.business_unit_code;
     const refUpper = ref.toUpperCase();
+    const match = refUpper.match(/(QUO-[^\s\]]+|YUT-[^\s\]]+|SH-[^\s\]]+|SNT-[^\s\]]+|LV-[^\s\]]+|SB-[^\s\]]+)/);
     
-    if (bu === 'YUT' || refUpper.includes('QUO-') || refUpper.includes('YUT-')) module = 'yutong';
-    else if (bu === 'SPH' || refUpper.includes('SH-')) module = 'special_hire';
-    else if (bu === 'SNT' || refUpper.includes('SNT-')) module = 'sinotruk';
-    else if (bu === 'LTV' || refUpper.includes('LV-')) module = 'lightvehicle';
-    else if (bu === 'SBO' || refUpper.includes('SB-')) module = 'school_bus';
+    if (!match) {
+        toast({ title: "Not an Order", description: "This transaction does not contain a valid vehicle order reference.", variant: "default" });
+        return;
+    }
+
+    const searchRef = match[1];
+    
+    if (searchRef.startsWith('QUO-') || searchRef.startsWith('YUT-')) module = 'yutong';
+    else if (searchRef.startsWith('SH-')) module = 'special_hire';
+    else if (searchRef.startsWith('SNT-')) module = 'sinotruk';
+    else if (searchRef.startsWith('LV-')) module = 'lightvehicle';
+    else if (searchRef.startsWith('SB-')) module = 'school_bus';
 
     if (!module) {
-        toast({ title: "Unknown Module", description: `Cannot determine business module from reference: ${ref}`, variant: "destructive" });
+        toast({ title: "Unknown Module", description: `Cannot determine business module from reference: ${searchRef}`, variant: "destructive" });
         return;
     }
 
     let orderTable = `${module}_orders`;
     let orderCol = module === 'special_hire' ? 'booking_reference' : 'order_no';
-    
-    const match = refUpper.match(/(QUO-[^\s\]]+|YUT-[^\s\]]+|SH-[^\s\]]+|SNT-[^\s\]]+|LV-[^\s\]]+|SB-[^\s\]]+)/);
-    const searchRef = match ? match[1] : refUpper;
 
     try {
       let orderIdStr = null;
@@ -153,6 +162,7 @@ export const PettyCashReplenishmentsTab = () => {
   const { data: allTransactions } = useAllPettyCashTransactions();
   const { data: bankAccounts } = useBankAccounts();
   const { data: profiles } = useAllProfiles();
+  const syncMutation = useSyncPettyCashGL();
 
   const getCreatorName = (userId: string | null) => {
     if (!userId) return "System";
@@ -172,6 +182,146 @@ export const PettyCashReplenishmentsTab = () => {
     return null;
   };
 
+  const columns: ColumnDef<any>[] = useMemo(() => [
+    {
+      accessorKey: "created_at",
+      header: "Date",
+      cell: ({ row }) => format(new Date(row.original.created_at), "MMM dd, yyyy"),
+    },
+    {
+      id: "company",
+      accessorFn: (row) => row.company?.short_code || row.company?.name || "-",
+      header: "Section",
+      cell: ({ row }) => {
+        const company = row.original.company;
+        return company ? <Badge variant="secondary" className="text-xs">{company.short_code || company.name}</Badge> : <span>-</span>;
+      },
+    },
+    {
+      id: "fund_name",
+      accessorFn: (row) => row.fund?.fund_name || "-",
+      header: "Fund",
+    },
+    {
+      accessorKey: "amount",
+      header: "Amount",
+      cell: ({ row }) => (
+        <span className={`font-semibold ${row.original.transaction_type === 'replenishment' ? 'text-green-600' : 'text-rose-600'}`}>
+          {row.original.transaction_type === 'replenishment' ? '+' : '-'}<CurrencyDisplay amount={row.original.amount} />
+        </span>
+      ),
+    },
+    {
+      accessorKey: "balance_after",
+      header: "Balance After",
+      cell: ({ row }) => <CurrencyDisplay amount={row.original.balance_after} />,
+    },
+    {
+      accessorKey: "payment_method",
+      header: "Method",
+      cell: ({ row }) => <Badge variant="outline">{row.original.payment_method || "cash"}</Badge>,
+    },
+    {
+      accessorKey: "reference_number",
+      header: "Reference",
+      cell: ({ row }) => <span className="text-sm">{row.original.reference_number || "-"}</span>,
+    },
+    {
+      id: "ap_ref",
+      accessorFn: (row) => extractAPRef(row.description) || "-",
+      header: "AP Ref",
+      cell: ({ row }) => {
+        const apRef = extractAPRef(row.original.description);
+        return apRef ? <Badge variant="secondary" className="text-xs font-mono">{apRef}</Badge> : <span>-</span>;
+      },
+    },
+    {
+      id: "created_by",
+      accessorFn: (row) => getCreatorName(row.created_by),
+      header: "Created By",
+      cell: ({ row }) => <span className="text-xs text-muted-foreground">{getCreatorName(row.original.created_by)}</span>,
+    },
+    {
+      accessorKey: "description",
+      header: "Description",
+      cell: ({ row }) => (
+        <span className="text-sm max-w-[200px] truncate block" title={row.original.description || ""}>
+          {row.original.description?.replace(/\s*\[AP:.*?\]/, "")?.replace(/from AP Payment:.*?$/, "") || "-"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-1 items-start">
+          <Badge variant={row.original.status === 'void' ? 'destructive' : 'default'} className="bg-emerald-500 hover:bg-emerald-600">
+            {row.original.status || "approved"}
+          </Badge>
+          {!row.original.journal_entry_id && row.original.status !== "void" && (
+            <Badge variant="destructive" className="text-[10px] px-1 h-4">JE Missing</Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const txn = row.original;
+        return (
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  Actions <MoreHorizontal className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setPreviewData(txn)}>
+                  <Eye className="h-4 w-4 mr-2" /> View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPreviewData(txn)}>
+                  <Printer className="h-4 w-4 mr-2" /> Print Voucher
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {txn.journal_entry_id && (
+                  <>
+                    <DropdownMenuItem onClick={() => handleOpenFinanceHub(txn)}>
+                      <Landmark className="h-4 w-4 mr-2" /> Finance Hub
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleViewJE(txn)}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" /> View JE
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                {!txn.journal_entry_id && txn.status !== "void" ? (
+                  <DropdownMenuItem onClick={() => setSyncingTransactionId(txn.id)}>
+                    <RefreshCw className="h-4 w-4 mr-2 text-orange-500" /> 
+                    <span className="text-orange-500 font-medium">Sync to GL</span>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => toast({ title: "Sync Data", description: "Transaction already synced.", variant: "default" })}>
+                    <RefreshCw className="h-4 w-4 mr-2 text-muted-foreground" /> <span className="text-muted-foreground">GL Synced</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem 
+                  onClick={() => handleReverse(txn)} 
+                  className="text-destructive focus:text-destructive"
+                  disabled={isReversing || txn.status === 'void'}
+                >
+                  {isReversing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Undo2 className="h-4 w-4 mr-2" />}
+                  {txn.status === 'void' ? 'Already Reversed' : 'Reverse'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ], [profiles, isReversing]);
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -186,105 +336,19 @@ export const PettyCashReplenishmentsTab = () => {
         </div>
       </div>
 
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Section</TableHead>
-              <TableHead>Fund</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-right">Balance After</TableHead>
-              <TableHead>Method</TableHead>
-              <TableHead>Reference</TableHead>
-              <TableHead>AP Ref</TableHead>
-              <TableHead>Created By</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
-              </TableRow>
-            ) : transactions?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No reimbursements found</TableCell>
-              </TableRow>
-            ) : (
-              transactions?.map((txn: any) => {
-                const apRef = extractAPRef(txn.description);
-                return (
-                  <TableRow key={txn.id}>
-                    <TableCell>{format(new Date(txn.created_at), "MMM dd, yyyy")}</TableCell>
-                    <TableCell>
-                      {txn.company ? (
-                        <Badge variant="secondary" className="text-xs">{txn.company.short_code || txn.company.name}</Badge>
-                      ) : "-"}
-                    </TableCell>
-                    <TableCell>{txn.fund?.fund_name || "-"}</TableCell>
-                    <TableCell className={`text-right font-semibold ${txn.transaction_type === 'replenishment' ? 'text-green-600' : 'text-rose-600'}`}>
-                      {txn.transaction_type === 'replenishment' ? '+' : '-'}<CurrencyDisplay amount={txn.amount} />
-                    </TableCell>
-                    <TableCell className="text-right"><CurrencyDisplay amount={txn.balance_after} /></TableCell>
-                    <TableCell><Badge variant="outline">{txn.payment_method || "cash"}</Badge></TableCell>
-                    <TableCell className="text-sm">{txn.reference_number || "-"}</TableCell>
-                    <TableCell className="text-sm">
-                      {apRef ? (
-                        <Badge variant="secondary" className="text-xs font-mono">{apRef}</Badge>
-                      ) : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-muted-foreground">
-                        {getCreatorName(txn.created_by)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm max-w-[200px] truncate" title={txn.description || ""}>
-                      {txn.description?.replace(/\s*\[AP:.*?\]/, "")?.replace(/from AP Payment:.*?$/, "") || "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            Actions <MoreHorizontal className="h-4 w-4 ml-2" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => setPreviewData(txn)}>
-                            <Eye className="h-4 w-4 mr-2" /> View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setPreviewData(txn)}>
-                            <Printer className="h-4 w-4 mr-2" /> Print Voucher
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleOpenFinanceHub(txn)}>
-                            <Landmark className="h-4 w-4 mr-2" /> Finance Hub
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewJE(txn)}>
-                            <FileSpreadsheet className="h-4 w-4 mr-2" /> View JE
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => toast({ title: "Sync Data", description: "Transaction already synced.", variant: "default" })}>
-                            <RefreshCw className="h-4 w-4 mr-2" /> Sync to GL
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleReverse(txn)} 
-                            className="text-destructive focus:text-destructive"
-                            disabled={isReversing || txn.status === 'void'}
-                          >
-                            {isReversing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Undo2 className="h-4 w-4 mr-2" />}
-                            {txn.status === 'void' ? 'Already Reversed' : 'Reverse'}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+      <Card className="p-4 border-none shadow-none">
+        {isLoading ? (
+          <div className="text-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={transactions || []}
+            searchKey="reference_number"
+            enableColumnFilters={true}
+          />
+        )}
       </Card>
 
       {/* Reimbursement Dialog */}
@@ -324,6 +388,13 @@ export const PettyCashReplenishmentsTab = () => {
           module={financeHubState.module}
         />
       )}
+
+      {/* GL Sync Dialog */}
+      <PettyCashGLSyncDialog
+        transactionId={syncingTransactionId}
+        isOpen={!!syncingTransactionId}
+        onClose={() => setSyncingTransactionId(null)}
+      />
     </div>
   );
 };

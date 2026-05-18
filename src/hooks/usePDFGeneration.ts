@@ -313,9 +313,9 @@ export function usePDFGeneration() {
           allowTaint: false,
           imageTimeout: 0,
         });
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
         if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', pdfSettings.margins.left, pdfSettings.margins.top, contentWidthMM, contentHeightMM, undefined, 'FAST');
+        pdf.addImage(imgData, 'JPEG', pdfSettings.margins.left, pdfSettings.margins.top, contentWidthMM, contentHeightMM, undefined, 'FAST');
         // Page numbers
         pdf.setFontSize(9);
         pdf.setTextColor(102, 102, 102);
@@ -532,7 +532,7 @@ export function usePDFGeneration() {
           imageTimeout: 0,
         });
 
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
         
         if (i > 0) {
           pdf.addPage();
@@ -541,7 +541,7 @@ export function usePDFGeneration() {
         // Add image to PDF with margins
         pdf.addImage(
           imgData,
-          'PNG',
+          'JPEG',
           marginMM,
           marginMM,
           pdfWidth - 2 * marginMM,
