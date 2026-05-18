@@ -26,6 +26,15 @@ const formatNIC = (val: string) => {
 // Only allow English letters, numbers, spaces, dots, and dashes
 const englishOnly = (val: string) => val.replace(/[^a-zA-Z0-9\s.\-]/g, '');
 
+const isValidNIC = (nic: string) => {
+  const cleaned = nic.replace(/\s/g, '').toUpperCase();
+  // Old format: 9 digits followed by V or X
+  const oldFormat = /^[0-9]{9}[VX]$/;
+  // New format: 12 digits
+  const newFormat = /^[0-9]{12}$/;
+  return oldFormat.test(cleaned) || newFormat.test(cleaned);
+};
+
 const formatBusNumber = (val: string) => {
   // Remove non-alphanumeric chars
   let cleaned = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -79,6 +88,17 @@ export default function CrewLogin() {
 
     setIsProcessing(true);
     const cleanNic = nic.replace(/\s/g, '');
+    
+    if (!isValidNIC(cleanNic)) {
+      toast({
+        title: "Invalid NIC Format",
+        description: "NIC must be 9 digits followed by V/X, or 12 digits.",
+        variant: "destructive"
+      });
+      setIsProcessing(false);
+      return;
+    }
+
     const success = await login(cleanNic);
     setIsProcessing(false);
 
@@ -112,6 +132,16 @@ export default function CrewLogin() {
 
     setIsProcessing(true);
     const cleanRegNic = regNic.replace(/\s/g, '');
+    
+    if (!isValidNIC(cleanRegNic)) {
+      toast({
+        title: "Invalid NIC Format",
+        description: "NIC must be 9 digits followed by V/X, or 12 digits.",
+        variant: "destructive"
+      });
+      setIsProcessing(false);
+      return;
+    }
     
     const finalAssignedBus = formatBusNumber(regAssignedBus);
 
@@ -224,6 +254,10 @@ export default function CrewLogin() {
                           onChange={(e) => setNic(formatNIC(e.target.value))}
                           className="h-12 pl-11 bg-white/50 hover:bg-white border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 tracking-wider shadow-sm transition-all rounded-xl font-medium"
                           required
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          autoComplete="off"
+                          spellCheck={false}
                         />
                       </div>
                     </div>
@@ -294,6 +328,10 @@ export default function CrewLogin() {
                           onChange={(e) => setRegNic(formatNIC(e.target.value))}
                           className="h-10 pl-10 bg-white/50 hover:bg-white border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm tracking-wider transition-all rounded-xl text-sm font-medium"
                           required
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          autoComplete="off"
+                          spellCheck={false}
                         />
                       </div>
                     </div>
@@ -379,6 +417,10 @@ export default function CrewLogin() {
                           onChange={(e) => setRegAssignedBus(formatBusNumber(e.target.value))}
                           className="h-10 pl-10 bg-white/50 hover:bg-white border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm font-bold tracking-wider uppercase transition-all rounded-xl text-sm"
                           required={regEmploymentType !== 'temporary'}
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          autoComplete="off"
+                          spellCheck={false}
                         />
                       </div>
                       <p className="text-[10px] text-slate-400 font-medium">Format: XX-1234 / ආකෘතිය: XX-1234 / வடிவம்: XX-1234</p>
