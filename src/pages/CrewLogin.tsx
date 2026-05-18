@@ -131,7 +131,7 @@ export default function CrewLogin() {
     setIsProcessing(false);
 
     if (result.success) {
-      toast({ title: "Registration Successful", description: "Welcome to NCG Speed Crew!" });
+      toast({ title: "Registration Successful", description: "Welcome to NCG LIFE!" });
       navigate('/public/crew');
     } else {
       toast({ title: "Registration Failed", description: result.error, variant: "destructive" });
@@ -174,7 +174,7 @@ export default function CrewLogin() {
               <Bus className="w-10 h-10 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
             </motion.div>
             <CardTitle className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 text-center tracking-tight drop-shadow-sm mb-2">
-              NCG Speed Crew
+              NCG LIFE
             </CardTitle>
             <CardDescription className="text-blue-100/90 text-center text-sm font-medium max-w-[280px] leading-relaxed relative z-10">
               Manage your trips, track performance & stay connected.

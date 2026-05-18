@@ -5,11 +5,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar as CalendarIcon, User, Bus, Route, ArrowRight, ArrowLeft, Sun, Moon, CheckCircle, ChevronRight, Check, Plus, Minus, FileText, Banknote, Receipt, Navigation, PartyPopper, Sparkles, Loader2, Send, Calculator, Trash2, Upload, CreditCard, Camera, Lock, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Calendar as CalendarIcon, User, Bus, Route, ArrowRight, ArrowLeft, Sun, Moon, CheckCircle, ChevronRight, Check, Plus, Minus, FileText, Banknote, Receipt, Navigation, PartyPopper, Sparkles, Loader2, Send, Calculator, Trash2, Upload, CreditCard, Camera, Lock, X, ChevronsUpDown } from "lucide-react";
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 import { GamificationBanner } from '@/components/trips/GamificationBanner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCrewAuth } from '@/contexts/CrewAuthContext';
+import CrewLogin from './CrewLogin';
 
 type Language = 'en' | 'si' | 'ta';
 
@@ -388,11 +391,17 @@ const AutocompleteInput = ({
 export default function PublicConductorUpload() {
   const { toast } = useToast();
   let crewMember: any = null;
+  let isAuthenticated = false;
   try {
     const auth = useCrewAuth();
     crewMember = auth.crewMember;
+    isAuthenticated = auth.isAuthenticated;
   } catch (e) {
     // Failsafe if used outside of CrewAuthProvider
+  }
+
+  if (!isAuthenticated) {
+    return <CrewLogin />;
   }
   
   // Persistent State Loaders
@@ -405,6 +414,8 @@ export default function PublicConductorUpload() {
 
   const [lang, setLang] = useState<Language>('si');
   const t = translations[lang];
+
+  const [routeOpen, setRouteOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [quoteIndex, setQuoteIndex] = useState(0);
@@ -1192,13 +1203,67 @@ export default function PublicConductorUpload() {
                             <CheckCircle className="w-4 h-4 text-emerald-500 ml-auto shrink-0" />
                           </div>
                         ) : (
-                          <AutocompleteInput 
-                            value={formData.routeName} 
-                            onChange={(v) => setFormData({ ...formData, routeName: v })} 
-                            options={history.routes || []} 
-                            placeholder={lang === 'si' ? 'කොළඹ - මහනුවර' : 'Colombo - Kandy'}
-                            icon={<Route className="w-4 h-4 text-blue-500" />}
-                          />
+                          <Popover open={routeOpen} onOpenChange={setRouteOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={routeOpen}
+                                className={`w-full h-10 px-3 justify-between bg-white border-slate-200 focus:ring-blue-500 rounded-md shadow-sm ${!formData.routeName ? 'text-slate-400 font-normal' : 'text-slate-800 font-medium'}`}
+                              >
+                                <div className="flex items-center truncate">
+                                  <Route className="w-4 h-4 text-blue-500 mr-2 shrink-0" />
+                                  <span className="truncate">{formData.routeName || (lang === 'si' ? 'මාර්ගය තෝරන්න' : 'Select Route')}</span>
+                                </div>
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[350px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder={lang === 'si' ? 'මාර්ගය සොයන්න...' : 'Search route...'} />
+                                <CommandList>
+                                  <CommandEmpty>No route found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {activeRoutes.length > 0 ? (
+                                      activeRoutes.map(r => (
+                                        <CommandItem
+                                          key={r.route_name}
+                                          value={r.route_name}
+                                          onSelect={() => {
+                                            setFormData({ ...formData, routeName: r.route_name });
+                                            setRouteOpen(false);
+                                          }}
+                                        >
+                                          <Check
+                                            className={`mr-2 h-4 w-4 ${formData.routeName === r.route_name ? "opacity-100" : "opacity-0"}`}
+                                          />
+                                          {r.route_name}
+                                        </CommandItem>
+                                      ))
+                                    ) : history.routes && history.routes.length > 0 ? (
+                                      history.routes.map((r: string) => (
+                                        <CommandItem
+                                          key={r}
+                                          value={r}
+                                          onSelect={() => {
+                                            setFormData({ ...formData, routeName: r });
+                                            setRouteOpen(false);
+                                          }}
+                                        >
+                                          <Check
+                                            className={`mr-2 h-4 w-4 ${formData.routeName === r ? "opacity-100" : "opacity-0"}`}
+                                          />
+                                          {r}
+                                        </CommandItem>
+                                      ))
+                                    ) : (
+                                      <CommandItem disabled>Loading routes...</CommandItem>
+                                    )}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       </div>
                       <div className="space-y-2 col-span-2 sm:col-span-1">
@@ -1253,11 +1318,30 @@ export default function PublicConductorUpload() {
                         <Button 
                           variant="outline" 
                           className="w-full mt-2 text-orange-600 border-orange-200 hover:bg-orange-50 text-xs font-bold"
-                          onClick={() => {
+                          onClick={async () => {
                             if (window.confirm("Are you sure you ran an extra trip today? This will send an override request to your Group Leader.")) {
                               setOverrideRequested(true);
                               setMaxTrips(prev => prev + 1);
                               toast({ title: "Override Requested", description: "You can now add an extra trip." });
+                              
+                              try {
+                                const supabasePublic = createAnonymousClient();
+                                await supabasePublic.from('conductor_submissions').insert({
+                                  conductor_name: formData.conductorName || 'Unknown',
+                                  conductor_phone: 'N/A',
+                                  bus_number: formData.busNumber,
+                                  trip_date: formData.tripDate,
+                                  image_url: 'override_request',
+                                  status: 'pending',
+                                  ocr_data: {
+                                    submission_type: 'override_request',
+                                    message: `Requested extra trip (Trip ${maxTrips + 1})`,
+                                    route_name: formData.routeName
+                                  }
+                                });
+                              } catch (e) {
+                                console.error('Failed to notify group leader:', e);
+                              }
                             }
                           }}
                         >

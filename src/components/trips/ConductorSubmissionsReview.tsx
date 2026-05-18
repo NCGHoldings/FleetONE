@@ -488,7 +488,11 @@ export const ConductorSubmissionsReview = () => {
                               {submission.conductor_name}
                             </div>
                             {submission.ocr_data?.submission_type && (
-                              <span className="capitalize px-1.5 py-0.5 bg-blue-100 text-blue-700 font-bold rounded text-[10px]">
+                              <span className={`capitalize px-1.5 py-0.5 font-bold rounded text-[10px] ${
+                                submission.ocr_data.submission_type === 'override_request'
+                                  ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
                                 {submission.ocr_data.submission_type.replace('_', ' ')}
                               </span>
                             )}
@@ -496,10 +500,23 @@ export const ConductorSubmissionsReview = () => {
                           
                           <Button 
                             onClick={() => handleReview(submission)} 
-                            className="w-full mt-1 bg-slate-800 hover:bg-slate-900 text-white font-medium h-10 shadow-sm"
+                            className={`w-full mt-1 font-medium h-10 shadow-sm ${
+                              submission.ocr_data?.submission_type === 'override_request'
+                                ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                                : 'bg-slate-800 hover:bg-slate-900 text-white'
+                            }`}
                           >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Review & Process
+                            {submission.ocr_data?.submission_type === 'override_request' ? (
+                              <>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Acknowledge Request
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Review & Process
+                              </>
+                            )}
                           </Button>
                         </div>
                       ))}

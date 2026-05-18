@@ -4,7 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { User, Bus, Route, ArrowRight, ArrowLeft, Send, CheckCircle, Navigation, Camera, Loader2, Play, Flag, Lock, Check, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { User, Bus, Route, ArrowRight, ArrowLeft, Send, CheckCircle, Navigation, Camera, Loader2, Play, Flag, Lock, Check, X, ChevronsUpDown } from "lucide-react";
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 import { GamificationBanner } from '@/components/trips/GamificationBanner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -244,6 +246,24 @@ export default function PublicDriverUpload() {
 
   const [loading, setLoading] = useState(false);
   const [quoteIndex, setQuoteIndex] = useState(0);
+
+  const [routeOpen, setRouteOpen] = useState(false);
+  const [activeRoutes, setActiveRoutes] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchRoutes = async () => {
+      try {
+        const supabasePublic = createAnonymousClient();
+        const { data, error } = await supabasePublic.rpc('get_public_route_targets');
+        if (data && !error) {
+          setActiveRoutes(data);
+        }
+      } catch (err) {
+        console.log("RPC fetch failed, will fallback to history.", err);
+      }
+    };
+    fetchRoutes();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => setQuoteIndex(prev => (prev + 1) % t.bannerReady.length), 5000);
@@ -585,7 +605,67 @@ export default function PublicDriverUpload() {
                   <CheckCircle className="w-4 h-4 text-emerald-500 ml-auto shrink-0" />
                 </div>
               ) : (
-                <AutocompleteInput value={formData.routeName} onChange={v => setFormData({...formData, routeName: v})} options={history.routes} placeholder="e.g. Colombo - Kandy" icon={<Route className="h-4 w-4" />} />
+                <Popover open={routeOpen} onOpenChange={setRouteOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={routeOpen}
+                      className={`w-full h-12 px-3 justify-between bg-slate-50 border-slate-200 focus:ring-blue-500 rounded-md shadow-sm ${!formData.routeName ? 'text-slate-400 font-normal' : 'text-slate-800 font-medium'}`}
+                    >
+                      <div className="flex items-center truncate">
+                        <Route className="w-4 h-4 text-blue-500 mr-2 shrink-0" />
+                        <span className="truncate">{formData.routeName || (lang === 'si' ? 'මාර්ගය තෝරන්න' : 'e.g. Colombo - Kandy')}</span>
+                      </div>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[350px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder={lang === 'si' ? 'මාර්ගය සොයන්න...' : 'Search route...'} />
+                      <CommandList>
+                        <CommandEmpty>No route found.</CommandEmpty>
+                        <CommandGroup>
+                          {activeRoutes.length > 0 ? (
+                            activeRoutes.map(r => (
+                              <CommandItem
+                                key={r.route_name}
+                                value={r.route_name}
+                                onSelect={() => {
+                                  setFormData({ ...formData, routeName: r.route_name });
+                                  setRouteOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${formData.routeName === r.route_name ? "opacity-100" : "opacity-0"}`}
+                                />
+                                {r.route_name}
+                              </CommandItem>
+                            ))
+                          ) : history.routes && history.routes.length > 0 ? (
+                            history.routes.map((r: string) => (
+                              <CommandItem
+                                key={r}
+                                value={r}
+                                onSelect={() => {
+                                  setFormData({ ...formData, routeName: r });
+                                  setRouteOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${formData.routeName === r ? "opacity-100" : "opacity-0"}`}
+                                />
+                                {r}
+                              </CommandItem>
+                            ))
+                          ) : (
+                            <CommandItem disabled>Loading routes...</CommandItem>
+                          )}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
           </CardContent>
