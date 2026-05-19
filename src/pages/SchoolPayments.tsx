@@ -652,17 +652,27 @@ export default function SchoolPayments() {
         const due = row.original.current_amount_due || 0;
         const balance = row.original.payment_balance || 0;
         const isActive = row.original.is_active !== false;
-        const hasPaymentHistory = Number(row.original.payment_amount) > 0 || balance > 0;
-        const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
 
         // Missing/Inactive students should be marked as missing to draw attention
         if (!isActive) {
           status = 'missing';
-        } else if (isMathematicallyPaid) {
-          // Dynamically override status based on actual calculated due
-          status = 'paid';
-        } else if (status !== 'paid') {
-          status = 'pending';
+        } else if (kpiMonth !== "all") {
+          // Dynamic Month Logic: if they paid ANYTHING in the selected KPI month, they are Paid for that month
+          const monthTx = allTransactions.filter(tx => tx.student_id === row.original.id && String(tx.payment_month).startsWith(kpiMonth));
+          if (monthTx.length > 0) {
+            status = 'paid';
+          } else {
+            status = 'pending';
+          }
+        } else {
+          // Lifetime "All Time" fallback logic
+          const hasPaymentHistory = Number(row.original.payment_amount) > 0 || balance > 0;
+          const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+          if (isMathematicallyPaid) {
+            status = 'paid';
+          } else if (status !== 'paid') {
+            status = 'pending';
+          }
         }
 
         return (

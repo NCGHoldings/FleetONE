@@ -13,11 +13,12 @@ import { generateLightVehicleRentalInvoiceHTML } from '@/lib/lightvehicle-rental
 import { usePDFGeneration } from '@/hooks/usePDFGeneration';
 
 interface LightVehicleRentalFormProps {
+  initialData?: any;
   onCancel: () => void;
   onSuccess: () => void;
 }
 
-export function LightVehicleRentalForm({ onCancel, onSuccess }: LightVehicleRentalFormProps) {
+export function LightVehicleRentalForm({ initialData, onCancel, onSuccess }: LightVehicleRentalFormProps) {
   const { toast } = useToast();
   const { selectedCompanyId } = useCompany();
   const { data: customers } = useCustomers();
@@ -45,6 +46,22 @@ export function LightVehicleRentalForm({ onCancel, onSuccess }: LightVehicleRent
     discount: '0',
   });
 
+  const isEditMode = !!initialData;
+
+  React.useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({
+        ...prev,
+        vehicle_name: initialData.vehicle_name || '',
+        vehicle_number: initialData.vehicle_number || '',
+        customer_id: initialData.customer_id || '',
+        start_date: initialData.start_date ? new Date(initialData.start_date).toISOString().split('T')[0] : prev.start_date,
+        monthly_rent_amount: initialData.monthly_rent_amount ? String(initialData.monthly_rent_amount) : '',
+        next_billing_date: initialData.next_billing_date ? new Date(initialData.next_billing_date).toISOString().split('T')[0] : prev.next_billing_date,
+      }));
+    }
+  }, [initialData]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -59,7 +76,30 @@ export function LightVehicleRentalForm({ onCancel, onSuccess }: LightVehicleRent
       
       const customer = customers?.find(c => c.id === formData.customer_id);
       
-      // 1. Create Rental Agreement
+      // 1. Create or Update Rental Agreement
+      if (isEditMode) {
+        const { error: updateError } = await supabase
+          .from('lightvehicle_rentals')
+          .update({
+            vehicle_name: formData.vehicle_name,
+            vehicle_number: formData.vehicle_number || null,
+            customer_id: formData.customer_id,
+            start_date: formData.start_date,
+            monthly_rent_amount: parseFloat(formData.monthly_rent_amount || '0'),
+            next_billing_date: formData.next_billing_date,
+          })
+          .eq('id', initialData.id);
+
+        if (updateError) throw updateError;
+
+        toast({
+          title: "Success",
+          description: "Rental agreement updated successfully."
+        });
+        onSuccess();
+        return; // Skip invoice generation for simple edits
+      }
+
       const { data: rentalData, error: rentalError } = await supabase
         .from('lightvehicle_rentals')
         .insert([{
@@ -221,10 +261,12 @@ export function LightVehicleRentalForm({ onCancel, onSuccess }: LightVehicleRent
                     <Label htmlFor="vehicle_number">Vehicle Reg Number</Label>
                     <Input id="vehicle_number" name="vehicle_number" value={formData.vehicle_number} onChange={handleChange} placeholder="e.g. WP CAA-1234"/>
                     </div>
-                    <div className="space-y-2">
-                    <Label htmlFor="mileage">Mileage</Label>
-                    <Input id="mileage" name="mileage" value={formData.mileage} onChange={handleChange} placeholder="e.g. 50,000 km"/>
-                    </div>
+                    {!isEditMode && (
+                      <div className="space-y-2">
+                      <Label htmlFor="mileage">Mileage</Label>
+                      <Input id="mileage" name="mileage" value={formData.mileage} onChange={handleChange} placeholder="e.g. 50,000 km"/>
+                      </div>
+                    )}
                 </div>
 
                 <div className="space-y-4">
@@ -238,10 +280,12 @@ export function LightVehicleRentalForm({ onCancel, onSuccess }: LightVehicleRent
                             ))}
                         </select>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="allocated_customer_name">Allocated Cu. Name</Label>
-                        <Input id="allocated_customer_name" name="allocated_customer_name" value={formData.allocated_customer_name} onChange={handleChange} placeholder="e.g. Lyceum Rathnapura"/>
-                    </div>
+                    {!isEditMode && (
+                      <div className="space-y-2">
+                          <Label htmlFor="allocated_customer_name">Allocated Cu. Name</Label>
+                          <Input id="allocated_customer_name" name="allocated_customer_name" value={formData.allocated_customer_name} onChange={handleChange} placeholder="e.g. Lyceum Rathnapura"/>
+                      </div>
+                    )}
                 </div>
             </div>
 
@@ -258,26 +302,30 @@ export function LightVehicleRentalForm({ onCancel, onSuccess }: LightVehicleRent
                         <Input type="date" id="next_billing_date" name="next_billing_date" required value={formData.next_billing_date} onChange={handleChange} />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                        <Label htmlFor="ref_no">Ref No</Label>
-                        <Input id="ref_no" name="ref_no" value={formData.ref_no} onChange={handleChange} />
+                    {!isEditMode && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                            <Label htmlFor="ref_no">Ref No</Label>
+                            <Input id="ref_no" name="ref_no" value={formData.ref_no} onChange={handleChange} />
+                            </div>
+                            <div className="space-y-2">
+                            <Label htmlFor="quote_no">Quote No</Label>
+                            <Input id="quote_no" name="quote_no" value={formData.quote_no} onChange={handleChange} />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                        <Label htmlFor="quote_no">Quote No</Label>
-                        <Input id="quote_no" name="quote_no" value={formData.quote_no} onChange={handleChange} />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                            <Label htmlFor="sbu">SBU</Label>
+                            <Input id="sbu" name="sbu" value={formData.sbu} onChange={handleChange} />
+                            </div>
+                            <div className="space-y-2">
+                            <Label htmlFor="user_name">User / Sales Rep</Label>
+                            <Input id="user_name" name="user_name" value={formData.user_name} onChange={handleChange} />
+                            </div>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                        <Label htmlFor="sbu">SBU</Label>
-                        <Input id="sbu" name="sbu" value={formData.sbu} onChange={handleChange} />
-                        </div>
-                        <div className="space-y-2">
-                        <Label htmlFor="user_name">User / Sales Rep</Label>
-                        <Input id="user_name" name="user_name" value={formData.user_name} onChange={handleChange} />
-                        </div>
-                    </div>
+                      </>
+                    )}
                 </div>
                 
                 <div className="space-y-4">
@@ -286,20 +334,24 @@ export function LightVehicleRentalForm({ onCancel, onSuccess }: LightVehicleRent
                         <Label htmlFor="monthly_rent_amount">Monthly Rent Amount (LKR) *</Label>
                         <Input type="number" step="0.01" min="0" id="monthly_rent_amount" name="monthly_rent_amount" required value={formData.monthly_rent_amount} onChange={handleChange} placeholder="0.00"/>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                        <Label htmlFor="fuel_expenses">Fuel Expenses (LKR)</Label>
-                        <Input type="number" step="0.01" min="0" id="fuel_expenses" name="fuel_expenses" value={formData.fuel_expenses} onChange={handleChange} placeholder="0.00"/>
+                    {!isEditMode && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                            <Label htmlFor="fuel_expenses">Fuel Expenses (LKR)</Label>
+                            <Input type="number" step="0.01" min="0" id="fuel_expenses" name="fuel_expenses" value={formData.fuel_expenses} onChange={handleChange} placeholder="0.00"/>
+                            </div>
+                            <div className="space-y-2">
+                            <Label htmlFor="gps_rental">GPS Rental (LKR)</Label>
+                            <Input type="number" step="0.01" min="0" id="gps_rental" name="gps_rental" value={formData.gps_rental} onChange={handleChange} placeholder="0.00"/>
+                            </div>
                         </div>
                         <div className="space-y-2">
-                        <Label htmlFor="gps_rental">GPS Rental (LKR)</Label>
-                        <Input type="number" step="0.01" min="0" id="gps_rental" name="gps_rental" value={formData.gps_rental} onChange={handleChange} placeholder="0.00"/>
+                            <Label htmlFor="discount">Discount (LKR)</Label>
+                            <Input type="number" step="0.01" min="0" id="discount" name="discount" value={formData.discount} onChange={handleChange} placeholder="0.00"/>
                         </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="discount">Discount (LKR)</Label>
-                        <Input type="number" step="0.01" min="0" id="discount" name="discount" value={formData.discount} onChange={handleChange} placeholder="0.00"/>
-                    </div>
+                      </>
+                    )}
                 </div>
             </div>
 
@@ -307,7 +359,7 @@ export function LightVehicleRentalForm({ onCancel, onSuccess }: LightVehicleRent
         <CardFooter className="flex justify-end gap-2 px-0 pb-0 pt-4 border-t">
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
           <Button type="submit" disabled={loading}>
-            {loading ? 'Processing...' : 'Save & Generate Invoice'}
+            {loading ? 'Processing...' : isEditMode ? 'Update Agreement' : 'Save & Generate Invoice'}
           </Button>
         </CardFooter>
       </form>

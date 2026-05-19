@@ -100,10 +100,20 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
 
       if (!tx) throw new Error("Transaction not found");
 
+      // Calculate the correct payment_month (first day of the selected month)
+      const newMonthStr = [
+        newDate.getFullYear(),
+        String(newDate.getMonth() + 1).padStart(2, '0'),
+        '01'
+      ].join('-');
+
       // 1. Update the payment transaction
       await supabase
         .from('school_payment_transactions')
-        .update({ payment_date: formattedDate })
+        .update({ 
+          payment_date: formattedDate,
+          payment_month: newMonthStr 
+        })
         .eq('id', tx.id);
 
       // 2. Sync General Ledger and Finance records

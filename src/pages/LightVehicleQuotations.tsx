@@ -31,6 +31,7 @@ export default function LightVehicleQuotations() {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [showRentalForm, setShowRentalForm] = useState(false);
+  const [editingRental, setEditingRental] = useState<any>(null);
   const activeTab = searchParams.get('tab') || 'quotations';
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
@@ -200,7 +201,16 @@ export default function LightVehicleQuotations() {
         </TabsContent>
 
         <TabsContent value="rentals" className="space-y-4">
-          <LightVehicleRentalsList onNewRental={() => setShowRentalForm(true)} />
+          <LightVehicleRentalsList 
+            onNewRental={() => {
+              setEditingRental(null);
+              setShowRentalForm(true);
+            }} 
+            onEditRental={(rental) => {
+              setEditingRental(rental);
+              setShowRentalForm(true);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="referral" className="space-y-4">
@@ -240,9 +250,14 @@ export default function LightVehicleQuotations() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <LightVehicleRentalForm
-              onCancel={() => setShowRentalForm(false)}
+              initialData={editingRental}
+              onCancel={() => {
+                setShowRentalForm(false);
+                setEditingRental(null);
+              }}
               onSuccess={() => {
                 setShowRentalForm(false);
+                setEditingRental(null);
                 // You could trigger a refresh here if needed
               }}
             />

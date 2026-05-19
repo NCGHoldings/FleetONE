@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Play, Plus, Receipt, FileText } from 'lucide-react';
+import { Play, Plus, Receipt, FileText, Pencil } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { LightVehicleRentalAgreementModal } from './LightVehicleRentalAgreementModal';
 
@@ -25,9 +25,10 @@ interface Rental {
 
 interface LightVehicleRentalsListProps {
   onNewRental: () => void;
+  onEditRental: (rental: Rental) => void;
 }
 
-export function LightVehicleRentalsList({ onNewRental }: LightVehicleRentalsListProps) {
+export function LightVehicleRentalsList({ onNewRental, onEditRental }: LightVehicleRentalsListProps) {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
   const [billingLoading, setBillingLoading] = useState(false);
@@ -165,6 +166,10 @@ export function LightVehicleRentalsList({ onNewRental }: LightVehicleRentalsList
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => onEditRental(rental)}>
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedRental(rental)}>
                       <FileText className="h-4 w-4 mr-1" />
                       Agreement

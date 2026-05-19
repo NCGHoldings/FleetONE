@@ -23,22 +23,13 @@ export function HistoricalDateRepairDialog({ branchId, onComplete }: { branchId:
 
       if (error) throw error;
 
-      // Filter for potentially inverted dates OR mismatched month records
+      // Filter for records where the payment_month doesn't match the payment_date
       const suspectRecords = (data || []).filter(p => {
         if (!p.payment_date || !p.payment_month) return false;
         const dDate = new Date(p.payment_date);
         const mDate = new Date(p.payment_month);
         
-        // 1. Inverted Date Suspect (Day <= 12 and month is something else, this is a heuristic)
-        // Wait, if it's inverted, day <= 12. But we ONLY want to flag it if it's likely inverted. 
-        // A better check: We will just allow fixing ANY date mismatch.
-        // Actually, let's keep the existing logic for inverted dates + add mismatched months
-        const isInverted = dDate.getDate() <= 12 && dDate.getFullYear() === 2026;
-        
-        // 2. Mismatched Month Suspect (e.g., Payment is April, but Month is August)
-        const isMismatched = dDate.getMonth() !== mDate.getMonth();
-        
-        return isInverted || isMismatched;
+        return dDate.getMonth() !== mDate.getMonth() || dDate.getFullYear() !== mDate.getFullYear();
       });
 
       setSuspects(suspectRecords);
@@ -62,35 +53,18 @@ export function HistoricalDateRepairDialog({ branchId, onComplete }: { branchId:
     try {
       for (const p of suspects) {
         const dDate = new Date(p.payment_date);
-        const mDate = new Date(p.payment_month);
-        
-        let finalFormattedDate = p.payment_date;
-        const isInverted = dDate.getDate() <= 12 && dDate.getFullYear() === 2026 && dDate.getMonth() === mDate.getMonth();
-        
-        // If it's mathematically inverted AND hasn't been fixed yet (months still match the bad date)
-        if (isInverted) {
-          const newMonthIndex = dDate.getDate() - 1;
-          const newDay = dDate.getMonth() + 1;
-          const correctedDate = new Date(dDate.getFullYear(), newMonthIndex, newDay);
-          finalFormattedDate = [
-            correctedDate.getFullYear(),
-            String(correctedDate.getMonth() + 1).padStart(2, '0'),
-            String(correctedDate.getDate()).padStart(2, '0')
-          ].join('-');
-        }
+        const finalFormattedDate = p.payment_date;
 
-        // Always sync the payment_month to whatever the final correct payment_date is
-        const finalDateObj = new Date(finalFormattedDate);
+        // Sync the payment_month to whatever the final correct payment_date is
         const newMonthStr = [
-          finalDateObj.getFullYear(),
-          String(finalDateObj.getMonth() + 1).padStart(2, '0'),
+          dDate.getFullYear(),
+          String(dDate.getMonth() + 1).padStart(2, '0'),
           '01'
         ].join('-');
 
         const { error } = await supabase
           .from('school_payment_transactions')
           .update({ 
-            payment_date: finalFormattedDate,
             payment_month: newMonthStr 
           })
           .eq('id', p.id);
@@ -138,59 +112,43 @@ export function HistoricalDateRepairDialog({ branchId, onComplete }: { branchId:
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-500" />
-            Repair Excel Date Inversions
+            Sync Background Dates
           </DialogTitle>
           <DialogDescription>
-            This tool safely swaps inverted dates (e.g. October 4th back to April 10th) caused by Excel American date formats (MM/DD/YYYY).
+            This tool safely synchronizes any background mismatches between the displayed Payment Date and the system's ledger/month values.
           </DialogDescription>
         </DialogHeader>
 
         {!scanned ? (
           <div className="py-6 text-center space-y-4">
             <p className="text-sm text-muted-foreground">
-              Step 1: Scan for potentially inverted dates where the Day is 12 or less (which allows it to be swapped with a Month).
+              Step 1: Scan for records where the internal Payment Month is out of sync with the visible Payment Date.
             </p>
             <Button onClick={handleScan} disabled={scanning} className="w-full">
-              {scanning ? "Scanning..." : "Scan Database for Suspects"}
+              {scanning ? "Scanning..." : "Scan for Mismatched Dates"}
             </Button>
           </div>
         ) : (
           <div className="py-4 space-y-4">
             <div className="bg-muted p-4 rounded-lg text-center">
               <p className="text-3xl font-bold text-orange-600">{suspects.length}</p>
-              <p className="text-sm text-muted-foreground">Potentially inverted payments found</p>
+              <p className="text-sm text-muted-foreground">Out of sync records found</p>
             </div>
             
             <div className="max-h-[150px] overflow-y-auto border rounded p-2 space-y-2">
               {suspects.slice(0, 10).map((s, i) => {
                 const dDate = new Date(s.payment_date);
-                const mDate = new Date(s.payment_month);
-                const isInverted = dDate.getDate() <= 12 && dDate.getFullYear() === 2026 && dDate.getMonth() === mDate.getMonth();
-                
-                let fixedDate = s.payment_date;
-                if (isInverted) {
-                  const newMonthIndex = dDate.getDate() - 1;
-                  const newDay = dDate.getMonth() + 1;
-                  const correctedDate = new Date(dDate.getFullYear(), newMonthIndex, newDay);
-                  fixedDate = [
-                    correctedDate.getFullYear(),
-                    String(correctedDate.getMonth() + 1).padStart(2, '0'),
-                    String(correctedDate.getDate()).padStart(2, '0')
-                  ].join('-');
-                }
-                
-                const fDateObj = new Date(fixedDate);
                 const fixedMonth = [
-                  fDateObj.getFullYear(),
-                  String(fDateObj.getMonth() + 1).padStart(2, '0'),
+                  dDate.getFullYear(),
+                  String(dDate.getMonth() + 1).padStart(2, '0'),
                   '01'
                 ].join('-');
 
                 return (
                   <div key={i} className="text-xs flex justify-between px-2 py-1 bg-background rounded border">
-                    <span className="text-red-600 line-through">Date: {s.payment_date} | Month: {s.payment_month}</span>
+                    <span className="text-red-600 line-through">Month: {s.payment_month}</span>
                     <span className="text-muted-foreground">→</span>
-                    <span className="text-green-600 font-medium">Date: {fixedDate} | Month: {fixedMonth}</span>
+                    <span className="text-green-600 font-medium">Month: {fixedMonth}</span>
                   </div>
                 );
               })}
@@ -211,7 +169,7 @@ export function HistoricalDateRepairDialog({ branchId, onComplete }: { branchId:
               disabled={repairing || suspects.length === 0} 
               className="w-full bg-orange-600 hover:bg-orange-700"
             >
-              {repairing ? "Repairing..." : "Swap Month & Day for All"}
+              {repairing ? "Syncing..." : "Sync All Background Dates"}
             </Button>
           </div>
         )}
