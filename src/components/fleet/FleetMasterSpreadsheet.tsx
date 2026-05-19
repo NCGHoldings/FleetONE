@@ -26,7 +26,7 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   const [editMode, setEditMode] = useState<EditMode>('master');
   const [dieselPrice, setDieselPrice] = useState<number>(() => {
     const saved = localStorage.getItem('fleet_diesel_price');
-    return saved ? Number(saved) : 350; // Default to 350 if not set
+    return saved ? Number(saved) : 392; // Default to 392 if not set
   });
 
   const handleDieselPriceChange = (val: string) => {

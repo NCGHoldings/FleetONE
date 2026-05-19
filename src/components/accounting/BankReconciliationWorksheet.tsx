@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation, useDraftReconciliation, useChartOfAccounts } from "@/hooks/useAccountingData";
@@ -558,49 +559,59 @@ const BankReconciliationWorksheet = () => {
         return next;
       }
       
-      // CLEARING logic (with smart auto-match)
+      // CLEARING logic
       const next = { ...prev, [txnId]: { cleared: true, clearedAmount: fullAmount } };
       
-      // Find which side this transaction belongs to
-      const isStatement = statementTxns.some(t => t.id === txnId);
-      const sourceTxn = isStatement ? statementTxns.find(t => t.id === txnId) : bookTxns.find(t => t.id === txnId);
+      // 1. Calculate the current running totals of selected items
+      let stmtSelected = 0;
+      let bookSelected = 0;
+      Object.keys(next).forEach(id => {
+         if (next[id].cleared) {
+            const stTxn = statementTxns.find(t => t.id === id);
+            if (stTxn) stmtSelected += ((stTxn.debit_amount || 0) > 0 ? (stTxn.debit_amount || 0) : -(stTxn.credit_amount || 0));
+            const bkTxn = bookTxns.find(t => t.id === id);
+            if (bkTxn) bookSelected += ((bkTxn.debit_amount || 0) > 0 ? (bkTxn.debit_amount || 0) : -(bkTxn.credit_amount || 0));
+         }
+      });
       
-      if (sourceTxn) {
-         const targetList = isStatement ? bookTxns : statementTxns;
-         const sourceDate = new Date(sourceTxn.transaction_date).getTime();
+      const diff = stmtSelected - bookSelected;
+      
+      // 2. If there's a difference, see if EXACTLY ONE unselected item can close the gap
+      if (diff !== 0) {
+         let matchCandidate = null;
+         const targetAmount = Math.abs(diff);
          
-         // Find potential matches on the opposite side
-         const matches = targetList.filter(t => {
-            // Skip already cleared or reconciled ones
-            if (t.is_reconciled || next[t.id]?.cleared) return false;
-            
-            // Exact amount match is required
-            const targetPayment = t.credit_amount || 0;
-            const targetDeposit = t.debit_amount || 0;
-            if (payment > 0 && targetPayment !== payment) return false;
-            if (deposit > 0 && targetDeposit !== deposit) return false;
-            
-            // Date must be within 3 days
-            const targetDate = new Date(t.transaction_date).getTime();
-            const diffDays = Math.abs(targetDate - sourceDate) / (1000 * 60 * 60 * 24);
-            if (diffDays > 3) return false;
-            
-            return true;
-         });
-         
-         if (matches.length > 0) {
-            // Sort by closest date
-            matches.sort((a, b) => {
-               const aDiff = Math.abs(new Date(a.transaction_date).getTime() - sourceDate);
-               const bDiff = Math.abs(new Date(b.transaction_date).getTime() - sourceDate);
-               return aDiff - bDiff;
+         // Helper to find a candidate in a list
+         const findCandidate = (list: any[], needDeposit: boolean) => {
+            const matches = list.filter(t => {
+               if (t.is_reconciled || next[t.id]?.cleared) return false;
+               const d = t.debit_amount || 0;
+               const p = t.credit_amount || 0;
+               if (needDeposit && d === targetAmount) return true;
+               if (!needDeposit && p === targetAmount) return true;
+               return false;
             });
-            
-            const bestMatch = matches[0];
-            const matchFullAmount = (bestMatch.credit_amount || 0) > 0 ? (bestMatch.credit_amount || 0) : (bestMatch.debit_amount || 0);
-            next[bestMatch.id] = { cleared: true, clearedAmount: matchFullAmount };
-            
-            toast.success(`Smart Auto-Match: Selected matching LKR ${fullAmount.toLocaleString()} on the ${isStatement ? 'Book' : 'Statement'} side!`);
+            // Only auto-match if there is exactly 1 obvious candidate, or pick the closest by date
+            if (matches.length > 0) {
+               // sort by date
+               matches.sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
+               return matches[0];
+            }
+            return null;
+         };
+
+         if (diff > 0) {
+            // Statement is larger. We need a Book Deposit OR a Statement Payment
+            matchCandidate = findCandidate(bookTxns, true) || findCandidate(statementTxns, false);
+         } else {
+            // Book is larger. We need a Statement Deposit OR a Book Payment
+            matchCandidate = findCandidate(statementTxns, true) || findCandidate(bookTxns, false);
+         }
+         
+         if (matchCandidate) {
+             const amt = (matchCandidate.credit_amount || 0) > 0 ? (matchCandidate.credit_amount || 0) : (matchCandidate.debit_amount || 0);
+             next[matchCandidate.id] = { cleared: true, clearedAmount: amt };
+             toast.success(`Smart Auto-Match: Found remaining LKR ${amt.toLocaleString()} to balance the selection!`);
          }
       }
       
@@ -1258,45 +1269,17 @@ const BankReconciliationWorksheet = () => {
                 <div className="flex-1 flex justify-between items-center px-4 py-2">
                    <span className="flex items-center gap-2 font-semibold text-sm"><BookOpen className="w-4 h-4 text-emerald-600" /> System Records (Book)</span>
                     <div className="flex gap-2 items-center">
-                      <div className="flex items-center gap-1 bg-muted/30 rounded-md p-1 border mr-2">
-                        <span className="text-[10px] text-muted-foreground px-1 uppercase tracking-wider font-bold">Month</span>
-                        <Input
-                          type="month"
-                          onChange={(e) => {
-                             const val = e.target.value;
-                             if (!val) {
-                               setFromDate(''); setToDate('');
-                               return;
-                             }
-                             const [y, m] = val.split('-');
-                             const start = new Date(parseInt(y), parseInt(m) - 1, 1);
-                             const end = new Date(parseInt(y), parseInt(m), 0);
-                             setFromDate(format(start, 'yyyy-MM-dd'));
-                             setToDate(format(end, 'yyyy-MM-dd'));
-                          }}
-                          className="h-6 text-xs w-[110px] bg-transparent border-0 focus-visible:ring-0 shadow-none p-0 cursor-pointer"
-                        />
-                      </div>
-                      <Input
-                         type="date"
-                         value={fromDate}
-                         onChange={(e) => setFromDate(e.target.value)}
-                         className="h-6 text-xs w-[110px]"
-                         placeholder="From Date"
+                      <DateRangePicker 
+                        value={{ 
+                          from: fromDate ? new Date(fromDate) : undefined, 
+                          to: toDate ? new Date(toDate) : undefined 
+                        }}
+                        onDateRangeChange={(range) => {
+                          setFromDate(range?.from ? format(range.from, 'yyyy-MM-dd') : '');
+                          setToDate(range?.to ? format(range.to, 'yyyy-MM-dd') : '');
+                        }}
+                        className="w-[280px]"
                       />
-                      <span className="text-muted-foreground text-xs">to</span>
-                      <Input
-                         type="date"
-                         value={toDate}
-                         onChange={(e) => setToDate(e.target.value)}
-                         className="h-6 text-xs w-[110px]"
-                         placeholder="To Date"
-                      />
-                      {(fromDate || toDate) && (
-                        <Button variant="ghost" size="sm" className="h-6 px-1 text-muted-foreground hover:text-red-600" onClick={() => { setFromDate(''); setToDate(''); }} title="Clear Dates">
-                          <X className="w-3 h-3" />
-                        </Button>
-                      )}
                       <Select value={displayFilter} onValueChange={(v) => setDisplayFilter(v as DisplayFilter)}>
                         <SelectTrigger className="h-6 text-xs w-[140px] bg-muted/50 border-0">
                           <SelectValue />

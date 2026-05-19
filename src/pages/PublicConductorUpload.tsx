@@ -433,7 +433,7 @@ export default function PublicConductorUpload() {
   const [currentStep, setCurrentStep] = useState<'hub' | 'trip' | 'fuel' | 'expenses'>('hub');
   
   // Gamification & Route Master State
-  const [fuelPrice, setFuelPrice] = useState<number>(350);
+  const [fuelPrice, setFuelPrice] = useState<number>(392);
   const [routeTarget, setRouteTarget] = useState<number>(0);
   const [fetchingMaster, setFetchingMaster] = useState(false);
   const [activeRoutes, setActiveRoutes] = useState<any[]>([]);

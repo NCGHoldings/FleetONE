@@ -11,7 +11,7 @@ import { format } from "date-fns";
 import { useARInvoices, useAllProfiles } from "@/hooks/useAccountingData";
 import { useDeleteARInvoice } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
-import { DataExportMenu } from "@/components/ui/DataExportMenu";
+import { ARExportModal } from "./ARExportModal";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -40,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export const AccountsReceivableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [invoiceFormOpen, setInvoiceFormOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const [receiptFormOpen, setReceiptFormOpen] = useState(false);
   const [selectedInvoiceForReceipt, setSelectedInvoiceForReceipt] = useState<any>(null);
   const [ageingReportOpen, setAgeingReportOpen] = useState(false);
@@ -601,24 +602,10 @@ export const AccountsReceivableView = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <DataExportMenu 
-              data={filteredInvoices || []}
-              title="Accounts Receivable"
-              filename="ar_invoices"
-              headers={["Invoice #", "Customer", "Bus No.", "Category", "Date", "Due Date", "Amount", "Paid", "Balance", "Status"]}
-              transformData={(data) => data.map(inv => [
-                inv.invoice_number || 'N/A',
-                inv.customers?.customer_name || 'N/A',
-                inv.bus_no || inv.school_ar_invoices?.[0]?.school_students?.bus_reg_no || 'N/A',
-                inv.bus_categories?.name || 'N/A',
-                inv.invoice_date ? format(new Date(inv.invoice_date), "MMM dd, yyyy") : 'N/A',
-                inv.due_date ? format(new Date(inv.due_date), "MMM dd, yyyy") : 'N/A',
-                inv.total_amount?.toString() || '0',
-                inv.paid_amount?.toString() || '0',
-                inv.balance?.toString() || '0',
-                inv.status || 'N/A'
-              ])}
-            />
+            <Button variant="outline" onClick={() => setExportModalOpen(true)}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
             <Button variant="outline" onClick={() => setAgeingReportOpen(true)}>
               <FileText className="h-4 w-4 mr-2" />
               AR Ageing Report
@@ -696,6 +683,13 @@ export const AccountsReceivableView = () => {
           if (!open) setSelectedInvoiceForReceipt(null);
         }}
         preselectedCustomerId={selectedInvoiceForReceipt?.customer_id}
+      />
+
+      {/* AR Export Modal */}
+      <ARExportModal 
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        data={invoices || []}
       />
 
       {/* AR Ageing Report Dialog */}

@@ -254,7 +254,7 @@ export default function CrewLogin() {
                           onChange={(e) => setNic(formatNIC(e.target.value))}
                           className="h-12 pl-11 bg-white/50 hover:bg-white border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 tracking-wider shadow-sm transition-all rounded-xl font-medium"
                           required
-                          autoCapitalize="characters"
+                          autoCapitalize="off"
                           autoCorrect="off"
                           autoComplete="off"
                           spellCheck={false}
@@ -328,7 +328,7 @@ export default function CrewLogin() {
                           onChange={(e) => setRegNic(formatNIC(e.target.value))}
                           className="h-10 pl-10 bg-white/50 hover:bg-white border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm tracking-wider transition-all rounded-xl text-sm font-medium"
                           required
-                          autoCapitalize="characters"
+                          autoCapitalize="off"
                           autoCorrect="off"
                           autoComplete="off"
                           spellCheck={false}

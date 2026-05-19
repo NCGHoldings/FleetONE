@@ -167,7 +167,9 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Filter companies based on user permissions
   const companies = useMemo(() => {
     const userEmail = session?.user?.email?.toLowerCase() || '';
-    const isSpecialAdmin = userEmail === 'abishekai34@gmail.com' || userEmail === 'abishekaai34@gmail.com';
+    const isSpecialAdmin = userEmail === 'abishekai34@gmail.com' || 
+                           userEmail === 'abishekaai34@gmail.com' ||
+                           userEmail === 'sudarakap@lyceumglobal.co';
 
     // If user has explicit company access configured, use that
     if (hasExplicitAccess) {

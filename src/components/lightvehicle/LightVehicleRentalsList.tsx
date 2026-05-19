@@ -40,14 +40,15 @@ export function LightVehicleRentalsList({ onNewRental }: LightVehicleRentalsList
     
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('lightvehicle_rentals')
         .select(`
           *,
           customers(customer_name)
         `)
-        .eq('company_id', selectedCompanyId)
         .order('created_at', { ascending: false });
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setRentals(data || []);

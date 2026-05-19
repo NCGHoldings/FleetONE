@@ -13,35 +13,34 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface DateRangePickerProps {
+  value?: DateRange;
   onDateRangeChange: (dateRange: { from?: Date; to?: Date } | undefined) => void;
   className?: string;
 }
 
 export function DateRangePicker({ 
+  value,
   onDateRangeChange, 
   className 
 }: DateRangePickerProps) {
-  const [date, setDate] = useState<DateRange | undefined>();
+  // Use controlled value if provided, else fall back to undefined
+  const date = value;
   const [pickerMode, setPickerMode] = useState<"single" | "range">("range");
 
   const handleRangeSelect = (selectedDate: DateRange | undefined) => {
-    setDate(selectedDate);
     onDateRangeChange(selectedDate);
   };
 
   const handleSingleSelect = (selectedDate: Date | undefined) => {
     if (!selectedDate) {
-      setDate(undefined);
       onDateRangeChange(undefined);
     } else {
       const newRange = { from: selectedDate, to: selectedDate };
-      setDate(newRange);
       onDateRangeChange(newRange);
     }
   };
 
   const handleClear = () => {
-    setDate(undefined);
     onDateRangeChange(undefined);
   };
 
@@ -103,6 +102,9 @@ export function DateRangePicker({
               onSelect={handleRangeSelect}
               numberOfMonths={2}
               className="p-3 pointer-events-auto"
+              captionLayout="dropdown-buttons"
+              fromYear={2010}
+              toYear={2035}
             />
           ) : (
             <Calendar
@@ -113,6 +115,9 @@ export function DateRangePicker({
               onSelect={handleSingleSelect}
               numberOfMonths={1}
               className="p-3 pointer-events-auto"
+              captionLayout="dropdown-buttons"
+              fromYear={2010}
+              toYear={2035}
             />
           )}
         </PopoverContent>

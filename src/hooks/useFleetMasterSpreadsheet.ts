@@ -51,7 +51,7 @@ export interface ExpandedFleetRow extends FleetRosterRow {
 
 export type EditMode = 'master' | 'daily';
 
-export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode = 'master', dieselPrice: number = 350) {
+export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode = 'master', dieselPrice: number = 392) {
   const [roster, setRoster] = useState<FleetRosterRow[]>([]);
   const [expandedRows, setExpandedRows] = useState<ExpandedFleetRow[]>([]);
   const [availableRoutes, setAvailableRoutes] = useState<any[]>([]);
