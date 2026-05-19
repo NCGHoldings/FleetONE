@@ -28,18 +28,18 @@ jobs:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
-          echo "🗄️ Preparing direct database connection string..."
+          echo "🗄️ Preparing pooled database connection string..."
           
-          # Since the production VPS has native IPv6 connectivity, we bypass the pooler entirely
-          # and connect directly to the database on port 5432.
-          # This Node script extracts the credentials and builds the direct connection URL.
-          DIRECT_DB_URL=$(node --input-type=module -e '
+          # Since the production VPS does not have stable IPv6 outbound routing, we use the
+          # IPv4-capable Supabase Pooler in Session Mode (port 5432) to stream the dump.
+          # The VPS's IPv4 address is whitelisted in Supabase, bypassing network restrictions securely.
+          POOLER_DB_URL=$(node --input-type=module -e '
             try {
               const url = new URL(process.env.DATABASE_URL);
               const projectRef = "wwjpdszkmtnzshbulkon";
-              url.hostname = `db.${projectRef}.supabase.co`;
+              url.hostname = "aws-0-ap-southeast-1.pooler.supabase.com";
               url.port = "5432";
-              url.username = "postgres";
+              url.username = `postgres.${projectRef}`;
               console.log(url.toString());
             } catch (e) {
               console.error("Error preparing URL:", e.message);
@@ -51,7 +51,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no root@$VPS_HOST "which pg_dump || (apt-get update -qq && apt-get install -y postgresql-client)"
           
           echo "🗄️ Running pg_dump on VPS and streaming backup back to GitHub runner..."
-          ssh -o StrictHostKeyChecking=no root@$VPS_HOST "pg_dump '$DIRECT_DB_URL' -Fc -Z 9" > supabase-backup.dump
+          ssh -o StrictHostKeyChecking=no root@$VPS_HOST "pg_dump '$POOLER_DB_URL' -Fc -Z 9" > supabase-backup.dump
           
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"
