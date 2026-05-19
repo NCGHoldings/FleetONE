@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History, FileSpreadsheet, Settings, FilterX, Trash2, Database, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { SchoolBusFinanceSettlement } from "@/components/school/SchoolBusFinance
 import { useAuth } from "@/hooks/useAuth";
 import React from "react";
 import * as XLSX from "xlsx";
+import { HistoricalDateRepairDialog } from "@/components/school-bus/HistoricalDateRepairDialog";
 
 interface Student {
   id: string;
@@ -77,6 +78,9 @@ export default function SchoolPayments() {
 
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  const [kpiMonth, setKpiMonth] = useState<string>("all");
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
 
   // Filters
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -86,6 +90,19 @@ export default function SchoolPayments() {
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const monthOptions = React.useMemo(() => {
+    const options = [{ value: "all", label: "All Time" }];
+    const d = new Date();
+    for (let i = 0; i < 6; i++) {
+      const year = d.getFullYear();
+      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+      const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+      options.push({ value: `${year}-${monthStr}`, label });
+      d.setMonth(d.getMonth() - 1);
+    }
+    return options;
+  }, []);
 
   const uniqueGrades = React.useMemo(() => {
     const grades = new Set(students.map(s => s.grade).filter(Boolean));
@@ -276,8 +293,8 @@ export default function SchoolPayments() {
       // Pass ALL students to state so they can be filtered by the UI dropdown
       console.log("FETCH STUDENTS SUCCESS, COUNT:", studentsWithComputedStatus.length);
       setStudents(studentsWithComputedStatus);
-      // calculateStats internally filters out inactive students for KPI accuracy
-      calculateStats(studentsWithComputedStatus, actualRevenue);
+      setAllTransactions(txData || []);
+      // We no longer call calculateStats here directly; we use a useEffect that listens to students, allTransactions, and kpiMonth
     } catch (error: any) {
       console.error('Error fetching students:', error);
       setErrorMsg(error.message || "Failed to load student payment data");
@@ -387,59 +404,83 @@ export default function SchoolPayments() {
     }
   };
 
-  const calculateStats = (studentData: Student[], actualRevenue: number = 0) => {
+  const calculateStats = useCallback((studentData: Student[], transactions: any[], monthFilter: string) => {
     // Only calculate stats for ACTIVE students to match the Total Students count
     const activeStudents = studentData.filter(s => s.is_active !== false);
-    
     const totalStudents = activeStudents.length;
-    
-    // Derive status from balance OR database payment_status to match dashboard
-    const paidStudents = activeStudents.filter(s => {
-      const due = s.current_amount_due || 0;
-      const balance = s.payment_balance || 0;
-      const hasPaymentHistory = Number(s.payment_amount) > 0 || balance > 0;
-      const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+
+    let totalRevenue = 0;
+    let paidStudentsCount = 0;
+    let pendingPaymentsCount = 0;
+
+    if (monthFilter === "all") {
+      // "All Time" fallback
+      totalRevenue = transactions.reduce((sum, tx) => sum + (Number(tx.amount_paid) || 0), 0);
       
-      const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
-      return isMathematicallyPaid || isStatusPaid;
-    }).length;
-    
-    const pendingPayments = activeStudents.filter(s => {
-      const due = s.current_amount_due || 0;
-      const balance = s.payment_balance || 0;
-      const hasPaymentHistory = Number(s.payment_amount) > 0 || balance > 0;
-      const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+      paidStudentsCount = activeStudents.filter(s => {
+        const due = s.current_amount_due || 0;
+        const balance = s.payment_balance || 0;
+        const hasPaymentHistory = Number(s.payment_amount) > 0 || balance > 0;
+        const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+        const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
+        return isMathematicallyPaid || isStatusPaid;
+      }).length;
       
-      const isMathematicallyPending = due > 0 || balance < 0 || !isMathematicallyPaid;
-      const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
-      const isStatusPending = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'pending';
-      return (isMathematicallyPending && !isStatusPaid) || isStatusPending;
-    }).length;
-    
-    // Revenue from actual transactions (we can keep this as total actual revenue for the branch regardless of student status)
-    const totalRevenue = actualRevenue;
-    
-    // Overdue = all outstanding (balance < 0)
+      pendingPaymentsCount = activeStudents.filter(s => {
+        const due = s.current_amount_due || 0;
+        const balance = s.payment_balance || 0;
+        const hasPaymentHistory = Number(s.payment_amount) > 0 || balance > 0;
+        const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+        const isMathematicallyPending = due > 0 || balance < 0 || !isMathematicallyPaid;
+        const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
+        const isStatusPending = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'pending';
+        return (isMathematicallyPending && !isStatusPaid) || isStatusPending;
+      }).length;
+
+    } else {
+      // Specific Month Filter
+      const [filterYear, filterMonth] = monthFilter.split('-');
+      
+      // Filter transactions that fall into this exact year-month
+      const monthTx = transactions.filter(tx => {
+        if (!tx.payment_date) return false;
+        const txParts = tx.payment_date.split('-');
+        return txParts[0] === filterYear && txParts[1] === filterMonth;
+      });
+
+      totalRevenue = monthTx.reduce((sum, tx) => sum + (Number(tx.amount_paid) || 0), 0);
+      
+      // Calculate Paid Students: count uniquely who actively made a payment in this month
+      const studentsWhoPaidIds = new Set(monthTx.map(tx => tx.student_id));
+      paidStudentsCount = activeStudents.filter(s => studentsWhoPaidIds.has(s.id)).length;
+      
+      // Pending Payments is total active students minus paid students for the month
+      pendingPaymentsCount = totalStudents - paidStudentsCount;
+    }
+
+    // Balances are real-time lifetime
     const overdueAmount = activeStudents
       .filter(s => s.payment_balance < 0)
       .reduce((sum, s) => sum + (s.current_amount_due || Math.abs(s.payment_balance) || 0), 0);
-    
-    // Total owed = sum of negative balances
     const totalOwed = activeStudents.reduce((sum, s) => sum + (s.payment_balance < 0 ? Math.abs(s.payment_balance) : 0), 0);
-    
-    // Advance/credit = sum of positive balances
     const totalCredit = activeStudents.reduce((sum, s) => sum + (s.payment_balance > 0 ? s.payment_balance : 0), 0);
 
     setStats({
       totalStudents,
-      paidStudents,
-      pendingPayments,
+      paidStudents: paidStudentsCount,
+      pendingPayments: pendingPaymentsCount,
       totalRevenue,
       overdueAmount,
       totalOwed,
       totalCredit,
     });
-  };
+  }, []);
+
+  useEffect(() => {
+    if (students.length > 0) {
+      calculateStats(students, allTransactions, kpiMonth);
+    }
+  }, [students, allTransactions, kpiMonth, calculateStats]);
 
   const handleRecordPayment = (student: Student) => {
     setSelectedStudent(student);
@@ -920,10 +961,20 @@ export default function SchoolPayments() {
           <Button onClick={() => navigate("/settings?tab=school-bus-finance")} variant="ghost" size="icon">
             <Settings className="w-4 h-4" />
           </Button>
-          <Button onClick={handleBulkSync} disabled={isSyncing} variant="default" className="bg-orange-600 hover:bg-orange-700">
-            <CheckCircle className="w-4 h-4 mr-2" />
-            {isSyncing ? "Syncing..." : "Fix April 29th Dates"}
-          </Button>
+          <div className="flex items-center gap-2 border-r pr-2 mr-2">
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">KPI Month:</span>
+            <Select value={kpiMonth} onValueChange={setKpiMonth}>
+              <SelectTrigger className="h-9 w-[140px]">
+                <SelectValue placeholder="Select Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <HistoricalDateRepairDialog branchId={branchId!} onComplete={fetchStudents} />
           <Button onClick={handleExport} variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Export Report

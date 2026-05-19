@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, CheckCircle, Eye, FileText, Printer, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, CheckCircle, Eye, FileText, Printer, Search, Pencil, Trash2, Download } from "lucide-react";
 import { ARInvoiceForm } from "./ARInvoiceForm";
 import { ARReceiptForm } from "./ARReceiptForm";
 import { ARAgeingReport } from "./ARAgeingReport";

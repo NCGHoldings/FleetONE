@@ -1,46 +1,18 @@
-const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
 
-// Read .env file for credentials
-const envFile = fs.readFileSync('.env', 'utf8');
-const lines = envFile.split('\n');
-let url = '';
-let key = '';
-for (const line of lines) {
-  if (line.startsWith('VITE_SUPABASE_URL=')) url = line.split('=')[1].trim();
-  if (line.startsWith('VITE_SUPABASE_SERVICE_ROLE_KEY=') || line.startsWith('VITE_SUPABASE_ANON_KEY=')) key = line.split('=')[1].trim();
-}
-
-const supabase = createClient(url, key);
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
 
 async function run() {
   const { data, error } = await supabase
-    .from('gl_journal_lines')
-    .select(`
-      account_id,
-      account_code,
-      account_name,
-      debit,
-      credit,
-      journal_entries!inner(entry_date, source_module, business_unit_code)
-    `);
-    //.eq('journal_entries.business_unit_code', 'SBO');
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-  
-  let accounts = {};
-  data.forEach(row => {
-    if (!accounts[row.account_name]) {
-       accounts[row.account_name] = { debit: 0, credit: 0, code: row.account_code };
-    }
-    accounts[row.account_name].debit += (row.debit || 0);
-    accounts[row.account_name].credit += (row.credit || 0);
-  });
-  
-  console.log(accounts);
+    .from('school_bus_payments')
+    .select('id, payment_date, amount_paid')
+    .gte('payment_date', '2026-01-01')
+    .order('created_at', { ascending: false })
+    .limit(10);
+    
+  if (error) console.error(error);
+  else console.table(data);
 }
-
 run();
