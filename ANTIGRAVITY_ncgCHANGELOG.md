@@ -1,3 +1,17 @@
+## 2026-05-19
+
+### ✅ Secure SSH-Streamed Database Backup (commit: `dd8d904a`)
+
+**Problem:** The nightly database backup workflow (`db-backup.yml`) was failing due to IPv6 direct connection constraints on the IPv4-only GitHub Actions runner and flaky regional connection pooler (Supavisor) authentication errors (`tenant/user not found`).
+
+**Files Modified:**
+- `.github/workflows/db-backup.yml` — Fully transitioned the backup dump execution to run directly on the dual-stack production VPS over SSH and stream the backup file back to the GitHub Actions runner. Removed runner IP whitelisting, propagation delays, and firewall revert steps entirely, improving security, simplicity, and reducing run time by 2+ minutes.
+
+**Architecture Notes:**
+- The backup dump file is streamed securely over SSH (`pg_dump` output redirected to `supabase-backup.dump` locally).
+- No secrets (such as DigitalOcean Spaces credentials, Telegram bot tokens, or retention rules) are stored on the VPS; they remain consolidated in GitHub Secrets.
+- Reconstructs the Supabase direct host URL (`db.wwjpdszkmtnzshbulkon.supabase.co:5432` with user `postgres`) dynamically on the runner prior to SSH execution, bypassing connection poolers completely.
+
 ## 2026-05-16
 
 ### ✅ Yutong Finance Sync UX & AR Auto-Creation Fix
