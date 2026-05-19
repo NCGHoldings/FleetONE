@@ -17,118 +17,29 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
 
-      - name: Whitelist Runner IP in Supabase
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: wwjpdszkmtnzshbulkon
-        run: |
-          # Get the runner's public IPv4 address
-          export RUNNER_IP=$(curl -s https://api.ipify.org)
-          echo "Runner IP is $RUNNER_IP"
-          
-          node -e '
-            (async () => {
-              const res = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions`, {
-                headers: { "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}` }
-              });
-              const data = await res.json();
-              
-              let existing = [];
-              if (data.config && data.config.dbAllowedCidrs) existing = data.config.dbAllowedCidrs;
-              else if (data.config && data.config.db_allowed_cidrs) existing = data.config.db_allowed_cidrs;
-              else if (data.db_allowed_cidrs) existing = data.db_allowed_cidrs;
-              else if (Array.isArray(data)) existing = data;
-              
-              // Save original list to revert later
-              require("fs").writeFileSync("original_cidrs.json", JSON.stringify(existing));
-              
-              // Add runner IP if not present
-              const cidr = `${process.env.RUNNER_IP}/32`;
-              if (!existing.includes(cidr)) {
-                existing.push(cidr);
-                console.log(`Adding runner IP: ${cidr}`);
-              } else {
-                console.log(`Runner IP ${cidr} already whitelisted.`);
-              }
-              
-              const applyRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
-                method: "POST",
-                headers: { 
-                  "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ db_allowed_cidrs: existing })
-              });
-              
-              if (!applyRes.ok) {
-                console.error("Failed to apply restrictions:", await applyRes.text());
-                process.exit(1);
-              }
-            })();
-          '
-          
-          # Wait for propagation (Supabase firewall updates can take 1-2 minutes)
-          echo "Waiting 120 seconds for firewall rules to propagate..."
-          sleep 120
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
-          echo "🗄️ Preparing database connection..."
+          echo "🗄️ Preparing direct database connection string..."
           
-          # GitHub Actions runners do not support IPv6 outbound connections.
-          # Since Supabase direct connections (db.wwjpdszkmtnzshbulkon.supabase.co) are IPv6-only,
-          # we MUST route the connection through the IPv4-capable Supabase Pooler (port 5432, Session Mode).
-          # This Node script automatically rewrites a direct connection string to the pooler connection string,
-          # dynamically querying the correct regional pooler from the Supabase API to avoid "tenant not found" errors.
-          DB_URL=$(node --input-type=module -e '
+          # Since the production VPS has native IPv6 connectivity, we bypass the pooler entirely
+          # and connect directly to the database on port 5432.
+          # This Node script extracts the credentials and builds the direct connection URL.
+          DIRECT_DB_URL=$(node --input-type=module -e '
             try {
               const url = new URL(process.env.DATABASE_URL);
               const projectRef = "wwjpdszkmtnzshbulkon";
-              let region = "ap-south-1"; // Default fallback (Mumbai, where this DB is located)
-              let resolved = false;
-              
-              // 1. Try to fetch the correct region from Supabase API dynamically first if Token is available
-              if (process.env.SUPABASE_ACCESS_TOKEN) {
-                try {
-                  const res = await fetch(`https://api.supabase.com/v1/projects/${projectRef}`, {
-                    headers: { "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}` }
-                  });
-                  if (res.ok) {
-                    const project = await res.json();
-                    if (project.region) {
-                      region = project.region;
-                      resolved = true;
-                      console.error("Successfully resolved region from Supabase API:", region);
-                    }
-                  } else {
-                    console.error("Supabase API returned non-OK status:", res.status, await res.text());
-                  }
-                } catch (apiErr) {
-                  console.error("Supabase API request failed:", apiErr.message);
-                }
-              }
-              
-              // 2. If API lookup did not succeed, fall back to extracting from the connection URL hostname
-              if (!resolved) {
-                const match = url.hostname.match(/aws-0-(.+)\.pooler\.supabase\.com/);
-                if (match) {
-                  region = match[1];
-                  console.error("Extracted region from pooler host:", region);
-                } else {
-                  console.error("Could not extract region from host, using default fallback:", region);
-                }
-              }
-              
-              const poolerHost = `aws-0-${region}.pooler.supabase.com`;
-              if (url.hostname.includes("supabase.co") || url.hostname.includes("pooler.supabase.com")) {
-                url.hostname = poolerHost;
-                url.port = "5432"; // Session mode
-                url.username = `postgres.${projectRef}`;
-              }
+              url.hostname = `db.${projectRef}.supabase.co`;
+              url.port = "5432";
+              url.username = "postgres";
               console.log(url.toString());
             } catch (e) {
               console.error("Error preparing URL:", e.message);
@@ -136,8 +47,11 @@ jobs:
             }
           ')
           
-          echo "🗄️ Starting database dump..."
-          pg_dump "$DB_URL" -Fc -Z 9 -f supabase-backup.dump
+          echo "🌐 Ensuring postgresql-client is installed on VPS..."
+          ssh -o StrictHostKeyChecking=no root@$VPS_HOST "which pg_dump || (apt-get update -qq && apt-get install -y postgresql-client)"
+          
+          echo "🗄️ Running pg_dump on VPS and streaming backup back to GitHub runner..."
+          ssh -o StrictHostKeyChecking=no root@$VPS_HOST "pg_dump '$DIRECT_DB_URL' -Fc -Z 9" > supabase-backup.dump
           
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"
@@ -236,31 +150,3 @@ jobs:
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d parse_mode="Markdown" \
             -d text="$MESSAGE"
-
-      # ── 6. Revert Network Restrictions ───────────────────────────────────────
-      - name: Revert Supabase Network Restrictions
-        if: always()
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: wwjpdszkmtnzshbulkon
-        run: |
-          node -e '
-            const fs = require("fs");
-            if (!fs.existsSync("original_cidrs.json")) process.exit(0);
-            const original = JSON.parse(fs.readFileSync("original_cidrs.json", "utf8"));
-            (async () => {
-              console.log("Reverting firewall settings...");
-              const res = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
-                method: "POST",
-                headers: { 
-                  "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ db_allowed_cidrs: original })
-              });
-              if (!res.ok) {
-                console.error(`Failed to revert firewall settings for project ${process.env.PROJECT_REF}:`, await res.text());
-                process.exit(1);
-              }
-            })();
-          '
