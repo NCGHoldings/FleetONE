@@ -76,13 +76,32 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          echo "🗄️ Starting database dump (Direct Connection)..."
+          echo "🗄️ Preparing database connection..."
           
-          if [[ "$DATABASE_URL" == *"pooler.supabase.com"* ]]; then
-            echo "⚠️ WARNING: You are using a pooler connection. It is highly recommended to use the Direct Connection (port 5432 on db.wwjpdszkmtnzshbulkon.supabase.co) for backups to avoid dropped connections during pg_dump."
-          fi
+          # GitHub Actions runners do not support IPv6 outbound connections.
+          # Since Supabase direct connections (db.wwjpdszkmtnzshbulkon.supabase.co) are IPv6-only,
+          # we MUST route the connection through the IPv4-capable Supabase Pooler (port 5432, Session Mode).
+          # This Node script automatically rewrites a direct connection string to the pooler connection string.
+          DB_URL=$(node -e '
+            try {
+              const url = new URL(process.env.DATABASE_URL);
+              const projectRef = "wwjpdszkmtnzshbulkon";
+              const poolerHost = "aws-0-ap-southeast-1.pooler.supabase.com";
+              
+              if (url.hostname.includes("supabase.co") || url.hostname.includes("pooler.supabase.com")) {
+                url.hostname = poolerHost;
+                url.port = "5432"; // Session mode
+                url.username = `postgres.${projectRef}`;
+              }
+              console.log(url.toString());
+            } catch (e) {
+              console.error("Invalid DATABASE_URL:", e.message);
+              process.exit(1);
+            }
+          ')
           
-          pg_dump "$DATABASE_URL" -Fc -Z 9 -f supabase-backup.dump
+          echo "🗄️ Starting database dump..."
+          pg_dump "$DB_URL" -Fc -Z 9 -f supabase-backup.dump
           
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"
