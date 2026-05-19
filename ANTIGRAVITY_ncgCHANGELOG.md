@@ -1,16 +1,16 @@
 ## 2026-05-19
 
-### ✅ Secure SSH-Streamed Database Backup (commit: `dd8d904a`)
+### ✅ Secure SSH-Streamed Database Backup (commit: `b42e30db`)
 
-**Problem:** The nightly database backup workflow (`db-backup.yml`) was failing due to IPv6 direct connection constraints on the IPv4-only GitHub Actions runner and flaky regional connection pooler (Supavisor) authentication errors (`tenant/user not found`).
+**Problem:** The nightly database backup workflow (`db-backup.yml`) was failing due to IPv6 direct connection constraints on the IPv4-only GitHub Actions runner, and subsequent execution on the production VPS timed out because the VPS lacks IPv6 outbound routing and the direct connection endpoint (`db.wwjpdszkmtnzshbulkon.supabase.co`) is strictly IPv6-only.
 
 **Files Modified:**
-- `.github/workflows/db-backup.yml` — Fully transitioned the backup dump execution to run directly on the dual-stack production VPS over SSH and stream the backup file back to the GitHub Actions runner. Removed runner IP whitelisting, propagation delays, and firewall revert steps entirely, improving security, simplicity, and reducing run time by 2+ minutes.
+- `.github/workflows/db-backup.yml` — Switched VPS-to-Supabase connection from the direct IPv6 hostname to the regional IPv4-compatible Session Mode connection pooler (`aws-0-ap-southeast-1.pooler.supabase.com` on port `5432`) using `postgres.wwjpdszkmtnzshbulkon` username routing.
 
 **Architecture Notes:**
 - The backup dump file is streamed securely over SSH (`pg_dump` output redirected to `supabase-backup.dump` locally).
 - No secrets (such as DigitalOcean Spaces credentials, Telegram bot tokens, or retention rules) are stored on the VPS; they remain consolidated in GitHub Secrets.
-- Reconstructs the Supabase direct host URL (`db.wwjpdszkmtnzshbulkon.supabase.co:5432` with user `postgres`) dynamically on the runner prior to SSH execution, bypassing connection poolers completely.
+- Because the VPS's IPv4 address is already whitelisted in Supabase's network restrictions, routing the backup connection over the IPv4 pooler bypasses all firewall constraints cleanly and avoids IPv6 timeout issues.
 
 ## 2026-05-16
 
